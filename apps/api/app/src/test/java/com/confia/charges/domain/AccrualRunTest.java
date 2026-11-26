@@ -109,4 +109,26 @@ class AccrualRunTest {
         assertThatThrownBy(() -> new PostingAccountMap.Entry(PostingPurpose.RECEIVABLE, "TUITION", receivable))
                 .isInstanceOf(InvalidChargesValueException.class);
     }
+
+    @Test
+    void thePostingAccountMapNeedsTheBenefitsAccountOnlyWhenABenefitMayApply() {
+        UUID receivable = UUID.randomUUID();
+        UUID revenue = UUID.randomUUID();
+        UUID benefits = UUID.randomUUID();
+        PostingAccountMap without = new PostingAccountMap(java.util.List.of(
+                new PostingAccountMap.Entry(PostingPurpose.RECEIVABLE, null, receivable),
+                new PostingAccountMap.Entry(PostingPurpose.REVENUE, null, revenue)));
+        PostingAccountMap with = new PostingAccountMap(java.util.List.of(
+                new PostingAccountMap.Entry(PostingPurpose.RECEIVABLE, null, receivable),
+                new PostingAccountMap.Entry(PostingPurpose.REVENUE, null, revenue),
+                new PostingAccountMap.Entry(PostingPurpose.BENEFITS, null, benefits)));
+
+        assertThat(without.benefits()).isEmpty();
+        assertThat(without.completeFor(java.util.List.of("TUITION"), false)).isTrue();
+        assertThat(without.completeFor(java.util.List.of("TUITION"), false, true)).isFalse();
+        assertThat(with.benefits()).contains(benefits);
+        assertThat(with.completeFor(java.util.List.of("TUITION"), false, true)).isTrue();
+        assertThatThrownBy(() -> new PostingAccountMap.Entry(PostingPurpose.BENEFITS, "TUITION", benefits))
+                .isInstanceOf(InvalidChargesValueException.class);
+    }
 }

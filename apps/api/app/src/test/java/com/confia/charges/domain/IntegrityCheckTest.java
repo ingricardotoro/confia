@@ -76,6 +76,48 @@ class IntegrityCheckTest {
     }
 
     @Test
+    void aChargeWithABenefitIsSoundWhenItsTransactionDebitsTheTotalPlusTheBenefit() {
+        World world = new World();
+        // The acceptance example: a base of 1,100.00, a benefit of 275.00, a tax of 123.75 and so a total of 948.75. The
+        // transaction debits the receivable for 948.75 and the benefits account for 275.00; it credits 1,223.75.
+        ChargeFact charge = new ChargeFact(UUID.randomUUID(), UUID.randomUUID(), hnl("948.75"), hnl("275.00"), null);
+        world.charges.add(charge);
+        world.postings.add(new PostingFact(charge.ledgerTransactionId(), "CHARGE", charge.chargeId(), null,
+                hnl("1223.75"), hnl("1223.75")));
+
+        assertThat(world.check().findings()).isEmpty();
+    }
+
+    @Test
+    void aChargeWithABenefitWhoseTransactionDebitsOnlyTheTotalIsAMismatch() {
+        World world = new World();
+        ChargeFact charge = new ChargeFact(UUID.randomUUID(), UUID.randomUUID(), hnl("948.75"), hnl("275.00"), null);
+        world.charges.add(charge);
+        world.postings.add(new PostingFact(charge.ledgerTransactionId(), "CHARGE", charge.chargeId(), null,
+                hnl("948.75"), hnl("948.75")));
+
+        assertThat(world.check().findings()).singleElement().satisfies(finding -> {
+            assertThat(finding.kind()).isEqualTo(IntegrityKind.CHARGE_TOTAL_MISMATCH);
+            assertThat(finding.expected()).isEqualTo(hnl("1223.75"));
+            assertThat(finding.actual()).isEqualTo(hnl("948.75"));
+        });
+    }
+
+    @Test
+    void aVoidedChargeWithABenefitHasAReversalThatMirrorsTheTotalPlusTheBenefit() {
+        World world = new World();
+        UUID reversal = UUID.randomUUID();
+        ChargeFact charge = new ChargeFact(UUID.randomUUID(), UUID.randomUUID(), hnl("0.00"), hnl("100.00"), reversal);
+        world.charges.add(charge);
+        world.postings.add(new PostingFact(charge.ledgerTransactionId(), "CHARGE", charge.chargeId(), null,
+                hnl("100.00"), hnl("100.00")));
+        world.postings.add(new PostingFact(reversal, "REVERSAL", charge.chargeId(), charge.ledgerTransactionId(),
+                hnl("100.00"), hnl("100.00")));
+
+        assertThat(world.check().findings()).isEmpty();
+    }
+
+    @Test
     void anInstitutionWithoutChargesIsSound() {
         Outcome outcome = new World().check();
 

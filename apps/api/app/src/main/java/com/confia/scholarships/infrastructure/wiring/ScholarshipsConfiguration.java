@@ -2,15 +2,19 @@ package com.confia.scholarships.infrastructure.wiring;
 
 import com.confia.catalog.application.directory.PaymentConceptDirectory;
 import com.confia.organization.application.directory.AcademicStructureDirectory;
+import com.confia.scholarships.application.AwardBenefitsService;
 import com.confia.scholarships.application.AwardDecisionRepository;
 import com.confia.scholarships.application.AwardRepository;
+import com.confia.scholarships.application.AwardsInForceRepository;
 import com.confia.scholarships.application.DecideAward;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
 import com.confia.scholarships.application.ScholarshipRepository;
 import com.confia.scholarships.application.ViewAwards;
+import com.confia.scholarships.application.api.AwardBenefits;
 import com.confia.scholarships.infrastructure.JooqAwardDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqAwardRepository;
+import com.confia.scholarships.infrastructure.JooqAwardsInForceRepository;
 import com.confia.scholarships.infrastructure.JooqScholarshipRepository;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.TransactionRunner;
@@ -43,6 +47,17 @@ public class ScholarshipsConfiguration {
     @Bean
     AwardDecisionRepository awardDecisionRepository(DSLContext dsl) {
         return new JooqAwardDecisionRepository(dsl);
+    }
+
+    @Bean
+    AwardsInForceRepository awardsInForceRepository(DSLContext dsl) {
+        return new JooqAwardsInForceRepository(dsl);
+    }
+
+    /** What the approved awards offer on a charge, which the accrual of {@code charges} reads (preview, simulator). */
+    @Bean
+    AwardBenefits awardBenefits(AwardsInForceRepository awardsInForce) {
+        return new AwardBenefitsService(awardsInForce);
     }
 
     @Bean

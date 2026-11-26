@@ -156,19 +156,110 @@ class ChargeEvaluatorTest {
                 AccrualErrorCode.NO_PRICE);
     }
 
+    private static BenefitOffer offer(String code, String amount) {
+        return new BenefitOffer(UUID.randomUUID(), code, Money.of(amount, CurrencyCode.HNL));
+    }
+
+    private static ChargeEvaluator offering(BenefitOffer... offers) {
+        return new ChargeEvaluator(base -> List.of(offers));
+    }
+
+    private static ComputedCharge withBenefit(ChargeEvaluator evaluator, String basePrice, boolean taxable) {
+        TaxRateInfo rate = rate(true, "15", "2027-01-01", null);
+        return evaluator.evaluate(student(true), PLAN, period(), concept(true, taxable, taxable ? rate.taxRateId() : null),
+                price(basePrice), taxable ? rate : null);
+    }
+
+    private static Money hnl(String amount) {
+        return Money.of(amount, CurrencyCode.HNL);
+    }
+
     @Test
     void aBenefitThatExceedsTheBaseIsRefusedAndAValidOneReducesTheTaxableBase() {
-        ChargeEvaluator tooMuch = new ChargeEvaluator(base -> base.add(Money.of("0.01", CurrencyCode.HNL)));
+        ChargeEvaluator tooMuch = new ChargeEvaluator(base -> List.of(new BenefitOffer(UUID.randomUUID(), "B",
+                base.add(Money.of("0.01", CurrencyCode.HNL)))));
         assertThatThrownBy(() -> tooMuch.evaluate(student(true), PLAN, period(), concept(true, false, null),
                 price("100.00"), null)).isInstanceOf(InvalidChargesValueException.class);
 
-        TaxRateInfo rate = rate(true, "10", "2027-01-01", null);
-        ChargeEvaluator tenOff = new ChargeEvaluator(base -> Money.of("10.00", CurrencyCode.HNL));
-        ComputedCharge charge = tenOff.evaluate(student(true), PLAN, period(), concept(true, true, rate.taxRateId()),
-                price("100.00"), rate);
+        ComputedCharge charge = withBenefit(offering(offer("B", "10.00")), "100.00", true);
 
-        assertThat(charge.amounts().tax()).isEqualTo(Money.of("9.00", CurrencyCode.HNL));
-        assertThat(charge.amounts().total()).isEqualTo(Money.of("99.00", CurrencyCode.HNL));
+        assertThat(charge.amounts().tax()).isEqualTo(hnl("13.50"));
+        assertThat(charge.amounts().total()).isEqualTo(hnl("103.50"));
+    }
+
+    @Test
+    void aScholarshipOfAQuarterOfAThousandOneHundredLeavesANetBaseOf825AndATaxOf12375() {
+        BenefitOffer quarter = offer("BECA-25", "275.00");
+
+        ComputedCharge charge = withBenefit(offering(quarter), "1100.00", true);
+
+        assertThat(charge.amounts().base()).isEqualTo(hnl("1100.00"));
+        assertThat(charge.amounts().discount()).isEqualTo(hnl("275.00"));
+        assertThat(charge.netBase()).isEqualTo(hnl("825.00"));
+        assertThat(charge.amounts().tax()).isEqualTo(hnl("123.75"));
+        assertThat(charge.amounts().total()).isEqualTo(hnl("948.75"));
+        assertThat(charge.benefit()).isEqualTo(quarter);
+    }
+
+    @Test
+    void theTaxOfTheReducedBaseIsRoundedOnceHalfUp() {
+        // 15 % of 33.50 is 5.025, which rounds up to 5.03; the tax of the gross base would be 15.00.
+        ComputedCharge charge = withBenefit(offering(offer("B", "66.50")), "100.00", true);
+
+        assertThat(charge.netBase()).isEqualTo(hnl("33.50"));
+        assertThat(charge.amounts().tax()).isEqualTo(hnl("5.03"));
+        assertThat(charge.amounts().total()).isEqualTo(hnl("38.53"));
+    }
+
+    @Test
+    void aBenefitThatTakesTheWholeBaseLeavesNothingToPayAndNoTax() {
+        ComputedCharge charge = withBenefit(offering(offer("B-100", "1100.00")), "1100.00", true);
+
+        assertThat(charge.netBase()).isEqualTo(hnl("0.00"));
+        assertThat(charge.amounts().tax()).isEqualTo(hnl("0.00"));
+        assertThat(charge.amounts().total()).isEqualTo(hnl("0.00"));
+        assertThat(charge.benefit().scholarshipCode()).isEqualTo("B-100");
+    }
+
+    @Test
+    void aBenefitOfZeroIsNoBenefitAndLeavesNoAwardOnTheCharge() {
+        ComputedCharge charge = withBenefit(offering(offer("B", "0.00")), "100.00", false);
+
+        assertThat(charge.amounts().discount()).isEqualTo(hnl("0.00"));
+        assertThat(charge.benefit()).isNull();
+        assertThat(charge.netBase()).isEqualTo(hnl("100.00"));
+    }
+
+    @Test
+    void withoutOffersTheChargeIsWhatItWasBeforeScholarships() {
+        ComputedCharge charge = withBenefit(ChargeEvaluator.withoutBenefits(), "1100.00", true);
+
+        assertThat(charge.amounts().discount()).isEqualTo(hnl("0.00"));
+        assertThat(charge.benefit()).isNull();
+        assertThat(charge.amounts().tax()).isEqualTo(hnl("165.00"));
+        assertThat(charge.amounts().total()).isEqualTo(hnl("1265.00"));
+    }
+
+    @Test
+    void ofTwoOffersTheGreatestBenefitIsAppliedAndOnlyOnce() {
+        BenefitOffer small = offer("A-SMALL", "100.00");
+        BenefitOffer great = offer("Z-GREAT", "300.00");
+
+        ComputedCharge charge = withBenefit(offering(small, great), "1000.00", false);
+
+        assertThat(charge.amounts().discount()).isEqualTo(hnl("300.00"));
+        assertThat(charge.benefit()).isEqualTo(great);
+        assertThat(charge.amounts().total()).isEqualTo(hnl("700.00"));
+    }
+
+    @Test
+    void anOfferInAnotherCurrencyThanTheChargeIsNotApplied() {
+        BenefitOffer usd = new BenefitOffer(UUID.randomUUID(), "USD-B", Money.of("10.00", CurrencyCode.USD));
+
+        ComputedCharge charge = withBenefit(offering(usd), "100.00", false);
+
+        assertThat(charge.amounts().discount()).isEqualTo(hnl("0.00"));
+        assertThat(charge.benefit()).isNull();
     }
 
     @Provide
