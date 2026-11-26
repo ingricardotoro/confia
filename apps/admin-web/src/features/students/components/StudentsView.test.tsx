@@ -28,6 +28,20 @@ function props(override: Partial<StudentsViewProps> = {}): StudentsViewProps {
 }
 
 describe("StudentsView", () => {
+  it("AW57: links to the scholarship awards of each student, by name, only when the person may read them", async () => {
+    const user = userEvent.setup();
+    const onAwards = vi.fn();
+    const { rerender } = renderWithAdminI18n(<StudentsView {...props()} />);
+    expect(screen.queryByRole("link", { name: /Becas de/ })).not.toBeInTheDocument();
+
+    rerender(<StudentsView {...props({ awardsHrefOf: (row) => `/scholarships/awards?studentId=${row.id}`, onAwards })} />);
+    const link = screen.getByRole("link", { name: "Becas de Ana Pérez" });
+    expect(link).toHaveAttribute("href", expect.stringContaining("/scholarships/awards?studentId="));
+    await user.click(link);
+
+    expect(onAwards).toHaveBeenCalledOnce();
+  });
+
   it("AW57: shows the code, the names, the date written for the person, the sex, a dash for no document and the state", () => {
     renderWithAdminI18n(<StudentsView {...props()} />);
 

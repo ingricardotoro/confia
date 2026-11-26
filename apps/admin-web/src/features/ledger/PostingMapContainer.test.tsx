@@ -57,7 +57,7 @@ describe("the map of posting accounts", () => {
     const asked = requests()
       .filter((sent) => sent.path === ACCOUNTS)
       .map((sent) => Object.fromEntries(new URLSearchParams(sent.search)));
-    expect(asked.map((query) => query["type"]).sort()).toEqual(["ASSET", "INCOME", "LIABILITY"]);
+    expect(asked.map((query) => query["type"]).sort()).toEqual(["ASSET", "EXPENSE", "INCOME", "LIABILITY"]);
     expect(asked.every((query) => query["active"] === "true" && query["size"] === "200")).toBe(true);
   });
 
@@ -69,13 +69,34 @@ describe("the map of posting accounts", () => {
     expect(optionsOf("Ingreso por matrícula")).toEqual(["Elija una cuenta", "ING-01 · Ingreso de colegiatura de prueba", "ING-02 · Otros ingresos de prueba"]);
   });
 
+  it("offers the scholarships row the income and the expense accounts, and no other, and saves its choice as the purpose BENEFITS", async () => {
+    const user = userEvent.setup();
+    const EXPENSE = ledgerAccount({ id: "00000000-0000-4000-8000-0000000000a7", code: "GAS-01", name: "Becas otorgadas de prueba", type: "EXPENSE", holdsStudentBalances: false });
+    await openMap([], [...CHART, EXPENSE]);
+    route("put", MAP, postingAccountMap([postingAccount({ purpose: "BENEFITS", ledgerAccountId: EXPENSE.id, version: 0 })]));
+
+    expect(optionsOf("Becas y descuentos")).toEqual([
+      "Elija una cuenta",
+      "ING-01 · Ingreso de colegiatura de prueba",
+      "ING-02 · Otros ingresos de prueba",
+      "GAS-01 · Becas otorgadas de prueba",
+    ]);
+    await user.selectOptions(screen.getByLabelText("Becas y descuentos"), EXPENSE.id);
+    await user.click(screen.getByRole("button", { name: "Guardar mapa" }));
+
+    await waitFor(() => {
+      expect(writes()).toHaveLength(1);
+    }, TIMEOUT);
+    expect(bodyOf(writes()[0])).toEqual({ entries: [{ purpose: "BENEFITS", ledgerAccountId: EXPENSE.id }] });
+  });
+
   it("shows an empty map as incomplete, row by row without configuring, and says it blocks the generation of charges", async () => {
     await openMap();
 
     const banner = screen.getByText("El mapa de cuentas está incompleto");
     expect(banner).toBeInTheDocument();
     expect(screen.getByText(/la generación de cargos queda bloqueada/)).toBeInTheDocument();
-    expect(screen.getAllByText("Sin configurar")).toHaveLength(9);
+    expect(screen.getAllByText("Sin configurar")).toHaveLength(10);
     expect(screen.getByRole("button", { name: "Guardar mapa" })).toBeDisabled();
   });
 

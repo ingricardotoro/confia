@@ -122,6 +122,7 @@ describe("the routes and the screens", () => {
       "/scholarships/awards",
       "/scholarships/awards/$awardId",
       "/scholarships/list",
+      "/scholarships/simulator",
       "/students",
     ]);
   });

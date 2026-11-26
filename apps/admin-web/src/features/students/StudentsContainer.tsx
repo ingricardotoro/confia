@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { StudentGuardiansContainer } from "../guardians/StudentGuardiansContainer.tsx";
 import { STATEMENT_PATH, studentStatementPath } from "../../shared/navigation/statement-paths.ts";
+import { SCHOLARSHIP_AWARDS_PATH, studentAwardsPath } from "../../shared/navigation/scholarship-paths.ts";
 import { STUDENT_CHARGES_PATH, studentChargesPath } from "../../shared/navigation/student-charges-paths.ts";
 import { toApiParams } from "../../shared/resource-screen/list-search.ts";
 import { usePermissions } from "../../shared/permissions/permissions.tsx";
@@ -74,6 +75,8 @@ export function StudentsContainer({ search, onSearchChange }: StudentsContainerP
         onStatement={(row) => void navigate({ to: STATEMENT_PATH, search: { studentId: row.id } })}
         chargesHrefOf={(row) => studentChargesPath(row.id)}
         onCharges={(row) => void navigate({ to: STUDENT_CHARGES_PATH, search: { studentId: row.id } })}
+        awardsHrefOf={can("scholarships:read") ? (row) => studentAwardsPath(row.id) : undefined}
+        onAwards={can("scholarships:read") ? (row) => void navigate({ to: SCHOLARSHIP_AWARDS_PATH, search: { studentId: row.id } }) : undefined}
         onGuardians={
           can("guardians:update")
             ? (row) => {

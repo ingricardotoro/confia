@@ -18,6 +18,7 @@ import {
 } from "./scenarios.ts";
 import { CASHBOX_BASE } from "./cashbox-model.ts";
 import { PAYMENTS_BASE } from "./payments-model.ts";
+import { AWARDS_BASE, SCHOLARSHIPS_BASE } from "./scholarships-model.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
 import { CHARGES_BASE } from "./charges-model.ts";
 import { LEDGER_BASE, POSTING_ACCOUNTS_PATH } from "./ledger-model.ts";
@@ -95,6 +96,8 @@ const SUCCESS_SCHEMAS: Readonly<Record<Operation, Schema | undefined>> = {
   cashbox: undefined,
   // The same for the payments (payments-model.ts).
   payments: undefined,
+  // The same for the scholarships and their awards (scholarships-model.ts).
+  scholarships: undefined,
 };
 
 /** The fields of a response that break the contract; empty when it meets it. The `instance` of an error is not checked (I306). */
@@ -263,6 +266,21 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
         headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
       });
       if (answer !== undefined) { deliver(res, scenario, "payments", answer); return; }
+    }
+    // The scholarships and their awards: the definition, the request, the decision of an award.
+    if (path === SCHOLARSHIPS_BASE || path.startsWith(`${SCHOLARSHIPS_BASE}/`) || path === AWARDS_BASE || path.startsWith(`${AWARDS_BASE}/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "scholarships", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.scholarships.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
+      if (answer !== undefined) { deliver(res, scenario, "scholarships", answer); return; }
     }
     // The cashbox: its sessions, their movements, the close and the approval.
     if (path.startsWith(`${CASHBOX_BASE}/`)) {

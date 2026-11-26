@@ -5,11 +5,22 @@ import { POSTING_ROLES, REVENUE_CATEGORIES, accountFits, changedEntries, changed
 const A = "00000000-0000-4000-8000-0000000000a1";
 const B = "00000000-0000-4000-8000-0000000000a2";
 
+describe("the scholarships row of the map", () => {
+  it("is read from the purpose BENEFITS, sent when it changes, and not required for the map to be complete", () => {
+    const saved = savedByRole([postingAccount({ purpose: "BENEFITS", ledgerAccountId: A, version: 2 })]);
+
+    expect(saved.get("BENEFITS")).toMatchObject({ ledgerAccountId: A, version: 2 });
+    expect(changedEntries(saved, { BENEFITS: B })).toEqual([{ purpose: "BENEFITS", ledgerAccountId: B, version: expect.any(Number) as number }]);
+    expect(missingRoles(new Map())).not.toContain("BENEFITS");
+  });
+});
+
 describe("the roles of the map", () => {
-  it("has the receivable, the tax payable, the default revenue, one revenue for each of the six categories, and the cash and the bank of the payments", () => {
+  it("has the receivable, the tax payable, the scholarships, the default revenue, one revenue for each of the six categories, and the cash and the bank of the payments", () => {
     expect(POSTING_ROLES.map((role) => role.id)).toEqual([
       "RECEIVABLE",
       "TAX_PAYABLE",
+      "BENEFITS",
       "REVENUE_DEFAULT",
       ...REVENUE_CATEGORIES.map((category) => `REVENUE_${category}`),
       "CASH",
@@ -32,6 +43,11 @@ describe("the roles of the map", () => {
     expect(accountFits(role("TAX_PAYABLE"), { type: "LIABILITY", holdsStudentBalances: true })).toBe(false);
     expect(accountFits(role("REVENUE_TUITION"), { type: "INCOME", holdsStudentBalances: false })).toBe(true);
     expect(accountFits(role("REVENUE_TUITION"), asset)).toBe(false);
+    // The scholarships take a contra-revenue (income) or an expense account that carries no student balance, until the accountant answers.
+    expect(accountFits(role("BENEFITS"), { type: "INCOME", holdsStudentBalances: false })).toBe(true);
+    expect(accountFits(role("BENEFITS"), { type: "EXPENSE", holdsStudentBalances: false })).toBe(true);
+    expect(accountFits(role("BENEFITS"), { type: "LIABILITY", holdsStudentBalances: false })).toBe(false);
+    expect(accountFits(role("BENEFITS"), { type: "EXPENSE", holdsStudentBalances: true })).toBe(false);
     // The cash and the bank are assets that carry no student balance.
     expect(accountFits(role("CASH"), { type: "ASSET", holdsStudentBalances: false })).toBe(true);
     expect(accountFits(role("CASH"), asset)).toBe(false);

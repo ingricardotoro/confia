@@ -51,6 +51,8 @@ describe("the shell with a restricted role", () => {
       "Estado de cuenta",
       "Cargos del estudiante",
       "Integridad de cargos",
+      // The simulator of charges only reads the charges, so it is listed for a session that reads them; the scholarships need their own permission.
+      "Simulador de cargos",
       "Estructura académica",
       "Importaciones",
     ]);

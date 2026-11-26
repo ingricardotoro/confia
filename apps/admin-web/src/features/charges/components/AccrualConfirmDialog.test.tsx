@@ -22,6 +22,27 @@ function props(override: Partial<AccrualConfirmDialogProps> = {}): AccrualConfir
 }
 
 describe("AccrualConfirmDialog", () => {
+  it("restates the scholarships the charges would carry, as the server rounded them, beside the total", () => {
+    const preview = accrualPreview({
+      totals: [
+        {
+          currency: "HNL",
+          charges: 1,
+          base: { amount: "1100.00", currency: "HNL" },
+          benefitAmount: { amount: "275.00", currency: "HNL" },
+          netBase: { amount: "825.00", currency: "HNL" },
+          tax: { amount: "123.75", currency: "HNL" },
+          total: { amount: "948.75", currency: "HNL" },
+        },
+      ],
+    });
+    renderWithAdminI18n(<AccrualConfirmDialog {...props({ preview })} />);
+
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("948.75 lempiras hondureños")).toBeInTheDocument();
+    expect(dialog.getByText(/Becas aplicadas:/)).toBeInTheDocument();
+    expect(dialog.getByText("275.00 lempiras hondureños")).toBeInTheDocument();
+  });
   it("says what will be posted to the ledger, with the total as the server sent it, and that it cannot be undone from here", () => {
     renderWithAdminI18n(<AccrualConfirmDialog {...props()} />);
 

@@ -44,7 +44,7 @@ export interface PostingMapViewProps {
 
 /** The key of the help of a row: each category of revenue shares one. */
 const helpKeyOf = (id: RoleId) =>
-  id === "RECEIVABLE" || id === "TAX_PAYABLE" || id === "REVENUE_DEFAULT" || id === "CASH" || id === "BANK" ? (`ledger.map.help.${id}` as const) : ("ledger.map.help.REVENUE" as const);
+  id === "RECEIVABLE" || id === "TAX_PAYABLE" || id === "BENEFITS" || id === "REVENUE_DEFAULT" || id === "CASH" || id === "BANK" ? (`ledger.map.help.${id}` as const) : ("ledger.map.help.REVENUE" as const);
 
 function MapSkeleton() {
   return (

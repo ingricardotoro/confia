@@ -50,8 +50,12 @@ export function AccrualConfirmDialog({ planName, periodLabel, preview, busy, fai
             </h3>
             <ul className="flex flex-col gap-0.5">
               {preview.totals.map((total) => (
-                <li key={total.currency}>
+                <li key={total.currency} className="flex flex-col">
                   <MoneyAmount value={total.total} size="lg" emphasis="strong" />
+                  <span className="flex items-center gap-1 text-sm text-text-secondary">
+                    {t("charges.accrual.confirmDialog.benefitLine")}
+                    <MoneyAmount value={total.benefitAmount} size="sm" />
+                  </span>
                 </li>
               ))}
             </ul>

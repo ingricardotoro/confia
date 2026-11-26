@@ -99,6 +99,23 @@ function PreviewItems({ preview, names, onRecalculate }: { readonly preview: Acc
     { id: "student", header: t("charges.accrual.items.student"), cell: (item) => names.student(item.studentId) },
     { id: "concept", header: t("charges.accrual.items.concept"), cell: (item) => names.concept(item.paymentConceptId) },
     { id: "base", header: t("charges.accrual.items.base"), align: "end", cell: (item) => (item.base === undefined ? noAmount : <MoneyAmount value={item.base} size="sm" />) },
+    {
+      id: "scholarship",
+      header: t("charges.accrual.items.scholarship"),
+      cell: (item) => (item.scholarshipCode == null ? t("charges.accrual.items.noScholarship") : item.scholarshipCode),
+    },
+    {
+      id: "benefit",
+      header: t("charges.accrual.items.benefit"),
+      align: "end",
+      cell: (item) => (item.benefitAmount === undefined ? noAmount : <MoneyAmount value={item.benefitAmount} size="sm" />),
+    },
+    {
+      id: "netBase",
+      header: t("charges.accrual.items.netBase"),
+      align: "end",
+      cell: (item) => (item.netBase === undefined ? noAmount : <MoneyAmount value={item.netBase} size="sm" />),
+    },
     { id: "tax", header: t("charges.accrual.items.tax"), align: "end", cell: (item) => (item.tax === undefined ? noAmount : <MoneyAmount value={item.tax} size="sm" />) },
     { id: "total", header: t("charges.accrual.items.total"), align: "end", cell: (item) => (item.total === undefined ? noAmount : <MoneyAmount value={item.total} size="sm" emphasis="strong" />) },
     { id: "result", header: t("charges.accrual.items.result"), cell: (item) => <AccrualOutcomeBadge mode="preview" outcome={item.outcome} errorCode={item.errorCode} /> },
@@ -209,6 +226,8 @@ function PreviewResult({
                 { id: "currency", header: t("charges.accrual.summary.currency"), cell: (total) => total.currency },
                 { id: "charges", header: t("charges.accrual.summary.charges"), align: "end", cell: (total) => String(total.charges) },
                 { id: "base", header: t("charges.accrual.summary.base"), align: "end", cell: (total) => <MoneyAmount value={total.base} size="sm" /> },
+                { id: "benefit", header: t("charges.accrual.summary.benefit"), align: "end", cell: (total) => <MoneyAmount value={total.benefitAmount} size="sm" /> },
+                { id: "netBase", header: t("charges.accrual.summary.netBase"), align: "end", cell: (total) => <MoneyAmount value={total.netBase} size="sm" /> },
                 { id: "tax", header: t("charges.accrual.summary.tax"), align: "end", cell: (total) => <MoneyAmount value={total.tax} size="sm" /> },
                 { id: "total", header: t("charges.accrual.summary.total"), align: "end", cell: (total) => <MoneyAmount value={total.total} size="sm" emphasis="strong" /> },
               ]}

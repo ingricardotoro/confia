@@ -8,7 +8,7 @@ import {
   problem,
   type ContractResponse,
 } from "../../src/test/contract-responses.ts";
-import { createAccrualSimulator, type AccrualScenario, type AccrualSimulator } from "./accrual-model.ts";
+import { createAccrualSimulator, type AccrualContext, type AccrualScenario, type AccrualSimulator } from "./accrual-model.ts";
 import type { CatalogModel } from "./catalog-model.ts";
 import {
   emptyPlans,
@@ -101,7 +101,13 @@ function schemaFailure(issues: readonly { path: PropertyKey[]; code: string }[])
 
 export function createChargesModel(
   options: ChargesOptions,
-  context: { readonly organization: OrganizationModel; readonly catalog: CatalogModel; readonly students?: StudentsModel },
+  context: {
+    readonly organization: OrganizationModel;
+    readonly catalog: CatalogModel;
+    readonly students?: StudentsModel;
+    /** What the scholarships of the scenario give a student on a concept (the simulator of charges reads it). */
+    readonly benefitFor?: AccrualContext["benefitFor"];
+  },
   now: () => Date = () => new Date(),
 ): ChargesModel {
   const data = options.seed === "seeded" ? seededPlans() : emptyPlans();
@@ -116,6 +122,7 @@ export function createChargesModel(
     concepts: () => context.catalog.rows(),
     readFailure,
     now,
+    ...(context.benefitFor === undefined ? {} : { benefitFor: context.benefitFor }),
   });
 
   /** The first edit of the `stale-first` scenario: someone else "saved" first, so the plan moves on and the edit is refused. */

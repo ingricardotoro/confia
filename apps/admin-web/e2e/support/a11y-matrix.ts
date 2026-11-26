@@ -160,6 +160,15 @@ async function chooseStudent(page: Page): Promise<void> {
   await page.getByRole("table", { name: /Cargos vigentes del estudiante/ }).waitFor();
 }
 
+/** The scholarships (scholarships-awards cut): the list, the awards, the seeded pending award another person requested, and the simulator of charges. */
+const SCHOLARSHIPS = "/scholarships/list";
+const AWARDS = "/scholarships/awards";
+const AWARD_PENDING = `${AWARDS}/00000000-0000-4000-8000-0000000f0001`;
+const SIMULATOR = "/scholarships/simulator";
+
+/** A route of the scholarships with the cookies of a signed in session: the same way in as the catalog's. */
+const openScholarshipsRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
+
 /** A route of the cashbox with the cookies of a signed in session: the same way in as the catalog's. */
 const openCashboxRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
 
@@ -1774,5 +1783,95 @@ export const MATRIX: readonly GateCombination[] = [
     state: "confirmed",
     arrange: (page) => openPaymentsRoute(page, PAYMENT_CONFIRMED),
     expected: (page) => page.getByRole("heading", { level: 3, name: "Datos del pago" }),
+  },
+  // The scholarships (scholarships-awards cut): the list with rows, empty and with a read that fails, and the form to create one; the awards with rows and empty;
+  // the request of an award; the detail of a pending award with its reject dialog; and the simulator, with nothing asked and with its result.
+  {
+    route: SCHOLARSHIPS,
+    state: "ready",
+    arrange: (page) => openScholarshipsRoute(page, SCHOLARSHIPS),
+    expected: (page) => page.getByRole("table", { name: "Becas de la institución" }).getByRole("row").nth(1),
+  },
+  {
+    route: SCHOLARSHIPS,
+    state: "empty",
+    preset: "scholarships-empty",
+    arrange: (page) => openScholarshipsRoute(page, SCHOLARSHIPS),
+    expected: (page) => page.getByText("Todavía no hay becas"),
+  },
+  {
+    route: SCHOLARSHIPS,
+    state: "load-error",
+    preset: "scholarships-server-error",
+    arrange: (page) => openScholarshipsRoute(page, SCHOLARSHIPS),
+    expected: (page) => page.getByText("No se pudieron cargar las becas"),
+  },
+  {
+    route: SCHOLARSHIPS,
+    state: "create-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, SCHOLARSHIPS);
+      await page.getByRole("button", { name: "Crear beca" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Crear una beca" }),
+  },
+  {
+    route: AWARDS,
+    state: "ready",
+    arrange: (page) => openScholarshipsRoute(page, AWARDS),
+    expected: (page) => page.getByRole("table", { name: "Otorgamientos de becas" }).getByRole("row").nth(1),
+  },
+  {
+    route: AWARDS,
+    state: "empty",
+    preset: "scholarships-empty",
+    arrange: (page) => openScholarshipsRoute(page, AWARDS),
+    expected: (page) => page.getByText("Todavía no hay otorgamientos"),
+  },
+  {
+    route: AWARDS,
+    state: "request-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, AWARDS);
+      await page.getByRole("button", { name: "Solicitar otorgamiento" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Solicitar un otorgamiento" }),
+  },
+  {
+    route: AWARD_PENDING,
+    state: "pending",
+    arrange: (page) => openScholarshipsRoute(page, AWARD_PENDING),
+    expected: (page) => page.getByRole("button", { name: "Aprobar" }),
+  },
+  {
+    route: AWARD_PENDING,
+    state: "reject-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, AWARD_PENDING);
+      await page.getByRole("button", { name: "Rechazar" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Rechazar el otorgamiento" }),
+  },
+  {
+    route: SIMULATOR,
+    state: "idle",
+    arrange: (page) => openScholarshipsRoute(page, SIMULATOR),
+    expected: (page) => page.getByText("Todavía no se ha simulado nada"),
+  },
+  {
+    route: SIMULATOR,
+    state: "result",
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, SIMULATOR);
+      await page.getByRole("combobox", { name: /^Estudiante/ }).fill("E-000001");
+      await page.getByRole("option", { name: /E-000001/ }).click();
+      await page.getByLabel(/^Plan de cobro/).selectOption({ label: "Primaria 2026" });
+      await page.getByLabel(/^Período/).selectOption({ label: "2026-05, vence el 5 may 2026" });
+      await page.getByRole("button", { name: "Simular" }).click();
+    },
+    expected: (page) => page.getByRole("table", { name: "Resultado de la simulación por concepto" }),
   },
 ];
