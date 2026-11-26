@@ -3,7 +3,7 @@ import type { SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import { StatementStudentPicker, type StatementStudentPickerProps } from "../../../shared/student-lookups/components/StatementStudentPicker.tsx";
-import type { ChargeSimulation, ChargeSimulationLine } from "../../../shared/api/charges-operations.ts";
+import type { ChargeSimulation, ChargeSimulationLine } from "../scholarships-types.ts";
 
 const focusField = (id: string) => () => {
   document.getElementById(id)?.focus();
