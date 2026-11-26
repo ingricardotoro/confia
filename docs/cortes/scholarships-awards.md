@@ -23,7 +23,8 @@ junto a pagos.
 - **Otorgamiento** (`ScholarshipAward`):
   - Liga una beca a un estudiante, para un año lectivo, con una vigencia (`validFrom`, `validTo`) dentro de ese año.
   - Nace `pending`. Pasa a `approved` o `rejected`; un otorgamiento aprobado puede pasar a `revoked`.
-  - Quien lo solicita no puede aprobarlo ni rechazarlo (segregación de funciones; `409 self-approval-forbidden`).
+  - Quien lo solicita no puede aprobarlo ni rechazarlo (segregación de funciones; `403 self-approval-forbidden`, igual que caja y
+    pagos desde la revisión de pagos; la nota decía `409` y se corrige aquí).
   - El rechazo y la revocación exigen un motivo de 20 a 500 caracteres, que no se copia a la bitácora.
   - Un estudiante no puede tener dos otorgamientos aprobados de la misma beca con vigencias que se solapen (restricción en la base de datos).
 - **Solo hacia adelante.**
@@ -138,3 +139,36 @@ junto a pagos.
 - Becas de otras monedas.
 - Notificación al encargado (`ScholarshipAwarded` → Notifications, cuando exista la pantalla de notificaciones).
 - Reportes de costo de becas.
+
+## Lo construido (backend T1, 2026-11-24)
+
+Parcial: migración, dominio, casos de uso y adaptadores están construidos y probados; la capa web está escrita pero sin registrar en una
+construcción verde (ver "Pendiente").
+
+- **Migración `V36__create_scholarships_core.sql`.** Tablas `scholarships_scholarship`, `scholarships_scholarship_concept`,
+  `scholarships_award` y `scholarships_award_decision`, con RLS forzada por institución, `NUMERIC(14,4)` más moneda y sin borrado.
+  La base rechaza: beneficio fuera de regla, beca sin conceptos, cambio de tipo o valor de una beca con otorgamientos aprobados o
+  revocados, validez fuera del año lectivo, otorgamiento nuevo o aprobación sobre beca inactiva, transiciones de estado distintas de
+  pendiente → aprobado|rechazado y aprobado → revocado, decisión de quien solicitó el otorgamiento, y dos otorgamientos aprobados de la
+  misma beca y estudiante con vigencias solapadas (restricción de exclusión sobre `daterange`).
+- **Dominio puro** (`Benefit`, `Scholarship`, `ScholarshipAward`, `AwardDecision`, `DecisionReason`) con `Money` y `HALF_UP` una sola vez.
+- **Casos de uso:** `ManageScholarships`, `RequestAward`, `DecideAward` (aprobar, rechazar, revocar con `Idempotency-Key` permanente en la
+  decisión) y `ViewAwards`. Auditoría de todas las acciones de la nota; el motivo solo se audita por su longitud.
+- **Pruebas:** 81 unitarias de dominio y 28 de integración contra PostgreSQL real (`ScholarshipsIT`).
+
+### Desviaciones
+
+- La autoaprobación responde `403 self-approval-forbidden` (convención de caja y pagos), no `409`.
+- Permisos usados: `scholarships:create` para definir, editar, desactivar, reactivar y solicitar; `approve` para aprobar y rechazar;
+  `void` para revocar. En `StaffRole`, el Administrador no tiene `scholarships:void` (solo Super Administrador); la nota decía que
+  ambos. No se cambió la matriz: decisión pendiente del propietario.
+- El valor del beneficio queda bloqueado si existe un otorgamiento aprobado o revocado alguna vez; nombre, tope y conceptos siguen editables.
+- Crear y solicitar no llevan `Idempotency-Key` (convención del catálogo); desactivar y reactivar son idempotentes por estado.
+- Que la vigencia esté dentro del año lo valida el trigger de la base, porque `organization` no publica las fechas del año.
+
+### Pendiente
+
+Requiere editar archivos fuera de la superficie autorizada: `PermissionedEndpoints.java` (12 rutas), `ProblemCode.java` y
+`i18n/problems.properties` (códigos `duplicate-scholarship-code`, `scholarship-benefit-locked`, `scholarship-award-overlap`,
+`invalid-award-state`) y `IdempotencyScopeExclusionInventoryTest` (`ScholarshipAwardController`). Después: registrar la capa web, regenerar
+`admin.openapi.json` y `packages/contracts`.
