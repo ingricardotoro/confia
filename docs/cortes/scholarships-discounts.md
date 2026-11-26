@@ -30,8 +30,8 @@ beneficios. El descuento por pronto pago llega después, junto a pagos. Se apoya
     después cada descuento sobre lo que queda. Ejemplo: base 1,000.00, beca 20 % y descuento 10 %: 1,000.00 → 800.00 → 720.00.
   - Si alguno no es acumulable, se aplica solo el de mayor beneficio, como en el corte 1. Con empate, la beca antes que el descuento, y
     entre descuentos el de código menor.
-  - Supuesto: la beca cuenta como acumulable; lo que decide es la marca de cada descuento. Entre becas sigue aplicándose solo la mayor.
-  - Supuesto: en la cascada, los descuentos de porcentaje van antes que los de monto fijo, y a igual tipo, por código.
+  - Confirmado por el propietario (2026-11-26): la beca cuenta como acumulable; lo que decide es la marca de cada descuento. Entre becas sigue aplicándose solo la mayor.
+  - Confirmado por el propietario (2026-11-26): en la cascada, los descuentos de porcentaje van antes que los de monto fijo, y a igual tipo, por código.
   - El beneficio total nunca deja la base por debajo de cero. El tope por período de la beca se calcula igual que en el corte 1.
 - **Cálculo** (servidor, `Money`, `HALF_UP` a dos decimales en cada paso de la cascada). El impuesto se calcula sobre la base neta, con el
   mismo supuesto pendiente del contador que el corte 1.
@@ -45,7 +45,7 @@ beneficios. El descuento por pronto pago llega después, junto a pagos. Se apoya
 
 ## Permisos
 
-Supuesto: los descuentos usan los permisos de becas, porque viven en el mismo módulo y los deciden los mismos roles.
+Confirmado por el propietario (2026-11-26): los descuentos usan los permisos de becas, porque viven en el mismo módulo y los deciden los mismos roles.
 `scholarships:create` define descuentos y solicita asignaciones, `scholarships:read` los consulta, `scholarships:approve` aprueba y
 rechaza, y `scholarships:void` revoca.
 

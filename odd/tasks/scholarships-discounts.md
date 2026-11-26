@@ -10,7 +10,7 @@ Branch: `feat/scholarships-discounts`. Delivery: ask-on-risk (split PRs over 800
 - S3: Stacking, user decision verbatim: "En cascada (Recommended)" — scholarship first on the gross base, then each discount on what remains, never below zero; if any benefit is not stackable, only the greatest applies.
 - S4: Agreement assignment, user decision verbatim: "Con aprobación (Recommended)" — one person requests, a different person approves; only an approved assignment in force reduces charges.
 - S5: Order: backend first, then contract (`admin.openapi.json`, `packages/contracts`), then frontend, then reviews (confia-code-reviewer and confia-security-auditor), then the roadmap line (also fix the F2 «Avance (2026-11-24)» "PR pendiente" to PRs #354 to #361).
-- S6: Assumptions pending the owner's confirmation: a scholarship counts as stackable; in the cascade, percentage discounts go before fixed-amount ones, then by code; discounts reuse the `scholarships:*` permissions; tax on the net base (accountant validation list).
+- S6: Assumptions confirmed by the owner (2026-11-26, "si"): a scholarship counts as stackable; in the cascade, percentage discounts go before fixed-amount ones, then by code; discounts reuse the `scholarships:*` permissions; tax on the net base (accountant validation list).
 
 ## Tasks
 
@@ -32,3 +32,4 @@ T3 = contracts and screens. T4 = reviews and fixes. T5 = roadmap line and cut no
 - L1 (2026-11-26, user): "si, sigamos con los descuentos".
 - L2 (2026-11-26, user): stacking "En cascada (Recommended)"; agreement assignment "Con aprobación (Recommended)".
 - L3: lessons from the cut-1 merge: each stacked slice must pass frontend CI alone (contract fixtures, route inventory AW59, dependency-cruiser `admin-presentation-is-pure`); do not run Prettier on admin-web src.
+- L4 (2026-11-26, user): "si" — confirms the four S6 assumptions.
