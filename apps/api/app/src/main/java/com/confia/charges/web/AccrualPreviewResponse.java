@@ -35,6 +35,9 @@ public record AccrualPreviewResponse(
             @Schema(requiredMode = RequiredMode.REQUIRED) String currency,
             @Schema(requiredMode = RequiredMode.REQUIRED) int charges,
             @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney base,
+            @Schema(requiredMode = RequiredMode.REQUIRED, description = "What the scholarships take off the bases")
+            AccrualMoney benefitAmount,
+            @Schema(requiredMode = RequiredMode.REQUIRED, description = "The bases minus the benefits") AccrualMoney netBase,
             @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney tax,
             @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney total) {
     }
@@ -48,8 +51,17 @@ public record AccrualPreviewResponse(
             String outcome,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) String errorCode,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) AccrualMoney base,
+            @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                    description = "What the scholarship takes off the base; zero when none applies") AccrualMoney benefitAmount,
+            @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                    description = "The base minus the benefit: what the tax is computed on") AccrualMoney netBase,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) AccrualMoney tax,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) AccrualMoney total,
+            @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                    description = "The award that gives the benefit; absent when no scholarship applies") UUID scholarshipAwardId,
+            @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                    description = "The code of the scholarship of the award; absent when no scholarship applies")
+            String scholarshipCode,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) UUID existingChargeId) {
     }
 }

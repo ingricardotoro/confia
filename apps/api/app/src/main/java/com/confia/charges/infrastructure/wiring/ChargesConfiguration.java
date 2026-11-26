@@ -31,6 +31,8 @@ import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.ledger.application.api.LedgerStatementApi;
 import com.confia.charges.application.ViewStudentStatement;
 import com.confia.organization.application.directory.PlacementDirectory;
+import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.charges.application.SimulateCharges;
 import com.confia.shared.jobs.JobScheduler;
 import com.confia.students.application.directory.EnrollmentRoster;
 import com.confia.students.application.directory.StudentDirectory;
@@ -171,8 +173,22 @@ public class ChargesConfiguration {
             ChargePlanItemRepository items, AccrualRunRepository runs, AccrualRunItemRepository runItems,
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
-            AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter, Clock clock) {
+            AwardBenefits awards, AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter, Clock clock) {
         return new ManageAccrual(transactionRunner, plans, items, runs, runItems, charges, placements, roster, students,
-                pricing, postingAccounts, ledgerAccounts, scheduler, auditLogWriter, clock);
+                pricing, postingAccounts, ledgerAccounts, awards, scheduler, auditLogWriter, clock);
+    }
+
+    /**
+     * The simulator of the charges of a student: the code of the accrual engine, which applies the approved scholarships, with
+     * nothing written but the audit entry of the consultation. It REQUIRES the {@link AwardBenefits} that {@code scholarships}
+     * publishes: a process that loads this configuration without it fails at startup, instead of simulating without benefits.
+     */
+    @Bean
+    SimulateCharges simulateCharges(TransactionRunner transactionRunner, ChargePlanRepository plans,
+            ChargePlanItemRepository items, ChargeRepository charges, PlacementDirectory placements,
+            EnrollmentRoster roster, StudentDirectory students, PricingDirectory pricing, AwardBenefits awards,
+            AuditLogWriter auditLogWriter) {
+        return new SimulateCharges(transactionRunner, plans, items, charges, placements, roster, students, pricing, awards,
+                auditLogWriter);
     }
 }

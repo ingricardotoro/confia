@@ -4,10 +4,12 @@ import com.confia.charges.application.ManageAccrual;
 import com.confia.charges.application.ManageChargePlans;
 import com.confia.charges.application.ManagePostingAccounts;
 import com.confia.charges.application.ListStudentCharges;
+import com.confia.charges.application.SimulateCharges;
 import com.confia.charges.application.ViewIntegrityRuns;
 import com.confia.charges.application.VoidCharge;
 import com.confia.charges.web.AccrualController;
 import com.confia.charges.web.ChargeController;
+import com.confia.charges.web.ChargeSimulationController;
 import com.confia.charges.web.IntegrityController;
 import com.confia.charges.web.ChargePlanController;
 import com.confia.charges.web.PostingAccountController;
@@ -41,6 +43,11 @@ public class ChargesWebConfiguration {
     @Bean
     ChargeController chargeController(VoidCharge voidCharge, ListStudentCharges listStudentCharges) {
         return new ChargeController(voidCharge, listStudentCharges);
+    }
+
+    @Bean
+    ChargeSimulationController chargeSimulationController(SimulateCharges simulation) {
+        return new ChargeSimulationController(simulation);
     }
 
     @Bean

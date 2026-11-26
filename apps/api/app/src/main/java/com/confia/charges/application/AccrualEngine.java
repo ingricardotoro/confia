@@ -5,6 +5,7 @@ import com.confia.charges.domain.AccrualErrorCode;
 import com.confia.charges.domain.AccrualFailure;
 import com.confia.charges.domain.AccrualPeriod;
 import com.confia.charges.domain.AccrualPeriods;
+import com.confia.charges.domain.BenefitOffer;
 import com.confia.charges.domain.ChargeEvaluator;
 import com.confia.charges.domain.ChargePlan;
 import com.confia.charges.domain.ComputedCharge;
@@ -15,6 +16,7 @@ import com.confia.charges.domain.StudentPlacement;
 import com.confia.charges.domain.TaxRateInfo;
 import com.confia.kernel.InstitutionId;
 import com.confia.organization.application.directory.PlacementDirectory;
+import com.confia.scholarships.application.api.AwardBenefits;
 import com.confia.students.application.directory.EnrollmentRoster;
 import com.confia.students.application.directory.StudentDirectory;
 import com.confia.students.application.directory.StudentRef;
@@ -32,6 +34,11 @@ import java.util.UUID;
  * the population of a period is, and what each student and concept of the plan would produce. It does arithmetic nowhere:
  * every amount comes from the pure rules of {@code charges.domain}. It opens no transaction, so the caller decides whether
  * the reads lock ({@code lockShare}) and in which transaction they run.
+ *
+ * <p>The benefit of a scholarship enters the pipeline of each charge as a step ({@link com.confia.charges.domain.BenefitsStep}):
+ * {@code scholarships} says what each approved award in force at the first day of the period offers on the base the price
+ * produced, and the pure rules of {@code charges.domain} choose the greatest and compute the tax on what is left. The preview, the
+ * run of the worker and the simulator all come through here, so they cannot disagree.
  */
 final class AccrualEngine {
 
@@ -57,15 +64,16 @@ final class AccrualEngine {
     private final StudentDirectory students;
     private final PricingDirectory pricing;
     private final ChargeRepository charges;
-    private final ChargeEvaluator evaluator = ChargeEvaluator.withoutBenefits();
+    private final AwardBenefits awards;
 
     AccrualEngine(PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
-            PricingDirectory pricing, ChargeRepository charges) {
+            PricingDirectory pricing, ChargeRepository charges, AwardBenefits awards) {
         this.placements = Objects.requireNonNull(placements, "placements");
         this.roster = Objects.requireNonNull(roster, "roster");
         this.students = Objects.requireNonNull(students, "students");
         this.pricing = Objects.requireNonNull(pricing, "pricing");
         this.charges = Objects.requireNonNull(charges, "charges");
+        this.awards = Objects.requireNonNull(awards, "awards");
     }
 
     /**
@@ -153,6 +161,7 @@ final class AccrualEngine {
     private ComputedCharge compute(InstitutionId institution, ChargePlan plan, StudentPlacement student,
             AccrualPeriods.PlanPeriod planPeriod, boolean lockShare) {
         UUID conceptId = planPeriod.paymentConceptId();
+        AccrualPeriod period = planPeriod.period();
         PricingDirectory.ConceptTerms terms = pricing.concept(institution, conceptId, lockShare)
                 .orElseThrow(() -> new AccrualFailure(AccrualErrorCode.CONCEPT_INACTIVE));
         ConceptTerms concept = new ConceptTerms(terms.conceptId(), terms.active(), terms.category(), terms.taxable(),
@@ -165,6 +174,9 @@ final class AccrualEngine {
         if (concept.taxable() && concept.taxRateId() != null) {
             rate = pricing.taxRate(institution, concept.taxRateId(), lockShare).map(AccrualEngine::toInfo).orElse(null);
         }
+        ChargeEvaluator evaluator = new ChargeEvaluator(base -> awards
+                .offers(institution, student.studentId(), conceptId, period.start(), base, lockShare).stream()
+                .map(offer -> new BenefitOffer(offer.awardId(), offer.scholarshipCode(), offer.amount())).toList());
         return evaluator.evaluate(student, plan.id(), planPeriod, concept, prices, rate);
     }
 

@@ -71,6 +71,8 @@ class PermissionedEndpointsTest {
                 Permission.CHARGES_UPDATE));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans/{id}/accrual-periods",
                 Permission.CHARGES_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/charges/plans/{planId}/simulation",
+                Permission.CHARGES_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/accrual-preview",
                 Permission.CHARGES_CREATE));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/charges/plans/{id}/accrual-runs",

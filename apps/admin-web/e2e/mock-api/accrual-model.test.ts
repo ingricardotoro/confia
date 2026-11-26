@@ -59,7 +59,7 @@ describe("the preview", () => {
     expect(body).toMatchObject({ planId: ACTIVE, periodStart: FRESH, studentsEvaluated: STUDENTS_IN_SCOPE, toCreate: 9, errors: 3, alreadyAccrued: 0, blockers: [] });
     expect(body.errorsByCode).toEqual({ NO_PRICE: 1, AMBIGUOUS_PRICE: 1, TAX_RATE_MISSING: 1 });
     expect(body.totals).toEqual([
-      { currency: "HNL", charges: 9, base: { amount: "13500.00", currency: "HNL" }, tax: { amount: "2025.00", currency: "HNL" }, total: { amount: "15525.00", currency: "HNL" } },
+      { currency: "HNL", charges: 9, base: { amount: "13500.00", currency: "HNL" }, benefitAmount: { amount: "0.00", currency: "HNL" }, netBase: { amount: "13500.00", currency: "HNL" }, tax: { amount: "2025.00", currency: "HNL" }, total: { amount: "15525.00", currency: "HNL" } },
     ]);
     expect(body.previewDigest).toMatch(/^[0-9a-f]{64}$/);
     const items = body.items as Wire[];

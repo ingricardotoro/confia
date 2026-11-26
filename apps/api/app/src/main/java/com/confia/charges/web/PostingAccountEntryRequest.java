@@ -9,8 +9,8 @@ import java.util.UUID;
 
 /** One entry of {@code PUT /api/v1/charges/posting-accounts}: the account of one purpose and, for the revenue, one category. */
 public record PostingAccountEntryRequest(
-        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"RECEIVABLE", "REVENUE", "TAX_PAYABLE"})
-        @NotNull @Pattern(regexp = "RECEIVABLE|REVENUE|TAX_PAYABLE") String purpose,
+        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"RECEIVABLE", "REVENUE", "TAX_PAYABLE", "BENEFITS"})
+        @NotNull @Pattern(regexp = "RECEIVABLE|REVENUE|TAX_PAYABLE|BENEFITS") String purpose,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
                 allowableValues = {"TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER"},
                 description = "Only for the revenue; absent sets the default revenue account")

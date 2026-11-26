@@ -39,13 +39,17 @@ public record AccrualPreviewResult(UUID planId, LocalDate periodStart, int stude
         return blockers.stream().map(AccrualRejection::code).toList();
     }
 
-    /** What the charges to create add up to in one currency. */
-    public record Total(String currency, int charges, Money base, Money tax, Money total) {
+    /** What the charges to create add up to in one currency: the benefit and the net base are the scholarships' share. */
+    public record Total(String currency, int charges, Money base, Money benefit, Money netBase, Money tax, Money total) {
     }
 
-    /** One student and concept of the preview; the amounts are present only for a charge to create. */
+    /**
+     * One student and concept of the preview; the amounts are present only for a charge to create. The benefit is zero and the
+     * award and the scholarship code are absent when no scholarship reduces the charge.
+     */
     public record Item(UUID studentId, UUID paymentConceptId, AccrualOutcome outcome, AccrualErrorCode errorCode,
-            Money base, Money tax, Money total, UUID existingChargeId) {
+            Money base, Money benefit, Money netBase, Money tax, Money total, UUID awardId, String scholarshipCode,
+            UUID existingChargeId) {
 
         /** The code of the error as text, or {@code null} when there is none. */
         public String error() {

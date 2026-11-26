@@ -234,6 +234,7 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/charges/plans", "/api/v1/charges/plans/{id}", "/api/v1/charges/plans/{id}/items",
                 "/api/v1/charges/plans/{id}/items/{itemId}", "/api/v1/charges/plans/{id}/accrual-periods",
                 "/api/v1/charges/plans/{id}/accrual-preview", "/api/v1/charges/plans/{id}/accrual-runs",
+                "/api/v1/charges/plans/{planId}/simulation",
                 "/api/v1/charges/accrual-runs", "/api/v1/charges/accrual-runs/{runId}",
                 "/api/v1/charges/students/{studentId}/statement", "/api/v1/charges/students/{studentId}/charges",
                 "/api/v1/charges/{chargeId}/void", "/api/v1/charges/integrity-runs",
@@ -435,7 +436,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(111);
+        assertThat(operations).isEqualTo(112);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH,
                 "get /api/v1/catalog/payment-concepts", "post /api/v1/catalog/payment-concepts",
                 "put /api/v1/catalog/payment-concepts/{id}", "get /api/v1/catalog/price-lists",
@@ -447,6 +448,7 @@ class OpenApiContractSnapshotTest {
                 "post /api/v1/charges/plans", "get /api/v1/charges/plans/{id}", "put /api/v1/charges/plans/{id}",
                 "post /api/v1/charges/plans/{id}/items", "delete /api/v1/charges/plans/{id}/items/{itemId}",
                 "get /api/v1/charges/plans/{id}/accrual-periods", "post /api/v1/charges/plans/{id}/accrual-preview",
+                "get /api/v1/charges/plans/{planId}/simulation",
                 "post /api/v1/charges/plans/{id}/accrual-runs", "get /api/v1/charges/accrual-runs",
                 "get /api/v1/charges/accrual-runs/{runId}", "get /api/v1/charges/students/{studentId}/statement",
                 "get /api/v1/charges/students/{studentId}/charges", "post /api/v1/charges/{chargeId}/void",

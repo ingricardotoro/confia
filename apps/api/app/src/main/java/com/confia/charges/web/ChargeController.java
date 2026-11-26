@@ -173,7 +173,8 @@ public class ChargeController {
                         row.voided().voidedAt(), row.voided().reason());
         return new StudentChargeResponse(row.id(), row.paymentConceptId(), view.conceptCode(), view.conceptName(),
                 row.conceptCategory(), row.periodLabel(), row.periodStart(), row.periodEnd(), row.dueOn(), row.origin(),
-                AccrualMoney.of(row.base()), AccrualMoney.of(row.tax()), AccrualMoney.of(row.total()),
+                AccrualMoney.of(row.base()), AccrualMoney.of(row.benefit()), AccrualMoney.of(row.netBase()),
+                row.scholarshipAwardId(), row.scholarshipCode(), AccrualMoney.of(row.tax()), AccrualMoney.of(row.total()),
                 AccrualMoney.of(view.paid()), AccrualMoney.of(view.outstanding()), view.settled(), row.statusName(),
                 voided);
     }

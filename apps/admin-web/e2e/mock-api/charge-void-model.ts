@@ -181,6 +181,8 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
       periodLabel: charge.periodStart.slice(0, 7),
       dueOn: charge.dueOn,
       base: amountOf(charge.baseCents),
+      benefitAmount: amountOf(0),
+      netBase: amountOf(charge.baseCents),
       tax: amountOf(charge.taxCents),
       total: amountOf(totalCents),
       paid: amountOf(covered.get(charge.id) ?? 0),

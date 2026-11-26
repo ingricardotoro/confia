@@ -8,7 +8,7 @@ import java.util.UUID;
 /** One row of the map of posting accounts: the account of the chart a purpose (and, for the revenue, a category) posts to. */
 public record PostingAccountResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) UUID id,
-        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"RECEIVABLE", "REVENUE", "TAX_PAYABLE"})
+        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"RECEIVABLE", "REVENUE", "TAX_PAYABLE", "BENEFITS"})
         String purpose,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
                 allowableValues = {"TUITION", "ENROLLMENT", "TRANSPORT", "MATERIAL", "FINE", "OTHER"},

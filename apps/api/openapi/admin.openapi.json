@@ -782,6 +782,34 @@
         "required" : [ "academicYearId", "createdAt", "dueDayOfMonth", "frequency", "id", "name", "status", "targetRefId", "targetScope", "updatedAt", "version" ],
         "type" : "object"
       },
+      "ChargeSimulationResponse" : {
+        "properties" : {
+          "lines" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Line"
+            },
+            "type" : "array"
+          },
+          "periodLabel" : {
+            "description" : "The period as YYYY-MM",
+            "type" : "string"
+          },
+          "periodStart" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "planId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "studentId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "lines", "periodLabel", "periodStart", "planId", "studentId" ],
+        "type" : "object"
+      },
       "ChargeVoidBody" : {
         "properties" : {
           "reason" : {
@@ -1996,12 +2024,22 @@
             "$ref" : "#/components/schemas/AccrualMoney",
             "type" : "null"
           },
+          "benefitAmount" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What the scholarship takes off the base; zero when none applies",
+            "type" : "null"
+          },
           "errorCode" : {
             "type" : [ "string", "null" ]
           },
           "existingChargeId" : {
             "format" : "uuid",
             "type" : [ "string", "null" ]
+          },
+          "netBase" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "The base minus the benefit: what the tax is computed on",
+            "type" : "null"
           },
           "outcome" : {
             "enum" : [ "CREATED", "ALREADY_ACCRUED", "ALREADY_ACCRUED_OTHER_PLAN", "ERROR" ],
@@ -2010,6 +2048,15 @@
           "paymentConceptId" : {
             "format" : "uuid",
             "type" : "string"
+          },
+          "scholarshipAwardId" : {
+            "description" : "The award that gives the benefit; absent when no scholarship applies",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "scholarshipCode" : {
+            "description" : "The code of the scholarship of the award; absent when no scholarship applies",
+            "type" : [ "string", "null" ]
           },
           "studentId" : {
             "format" : "uuid",
@@ -2107,6 +2154,58 @@
           }
         },
         "required" : [ "active", "code", "createdAt", "holdsStudentBalances", "id", "name", "type", "updatedAt", "version" ],
+        "type" : "object"
+      },
+      "Line" : {
+        "properties" : {
+          "base" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "type" : "null"
+          },
+          "benefitAmount" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What the scholarship takes off the base; zero when none applies",
+            "type" : "null"
+          },
+          "errorCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "existingChargeId" : {
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "netBase" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "The base minus the benefit: what the tax is computed on",
+            "type" : "null"
+          },
+          "outcome" : {
+            "enum" : [ "CREATED", "ALREADY_ACCRUED", "ALREADY_ACCRUED_OTHER_PLAN", "ERROR" ],
+            "type" : "string"
+          },
+          "paymentConceptId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "scholarshipAwardId" : {
+            "description" : "The award that gives the benefit; absent when no scholarship applies",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "scholarshipCode" : {
+            "description" : "The code of the scholarship of the award; absent when no scholarship applies",
+            "type" : [ "string", "null" ]
+          },
+          "tax" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "type" : "null"
+          },
+          "total" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "type" : "null"
+          }
+        },
+        "required" : [ "outcome", "paymentConceptId" ],
         "type" : "object"
       },
       "LinkedStudentResponse" : {
@@ -2627,8 +2726,8 @@
             "type" : "string"
           },
           "purpose" : {
-            "enum" : [ "RECEIVABLE", "REVENUE", "TAX_PAYABLE" ],
-            "pattern" : "RECEIVABLE|REVENUE|TAX_PAYABLE",
+            "enum" : [ "RECEIVABLE", "REVENUE", "TAX_PAYABLE", "BENEFITS" ],
+            "pattern" : "RECEIVABLE|REVENUE|TAX_PAYABLE|BENEFITS",
             "type" : "string"
           },
           "version" : {
@@ -2670,7 +2769,7 @@
             "type" : "string"
           },
           "purpose" : {
-            "enum" : [ "RECEIVABLE", "REVENUE", "TAX_PAYABLE" ],
+            "enum" : [ "RECEIVABLE", "REVENUE", "TAX_PAYABLE", "BENEFITS" ],
             "type" : "string"
           },
           "updatedAt" : {
@@ -3681,6 +3780,10 @@
           "base" : {
             "$ref" : "#/components/schemas/AccrualMoney"
           },
+          "benefitAmount" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What the scholarship took off the base; zero when none applied"
+          },
           "conceptCategory" : {
             "type" : "string"
           },
@@ -3697,6 +3800,10 @@
           "id" : {
             "format" : "uuid",
             "type" : "string"
+          },
+          "netBase" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "The base minus the benefit: what the tax was computed on"
           },
           "origin" : {
             "enum" : [ "AUTOMATIC", "MANUAL" ],
@@ -3726,6 +3833,15 @@
             "format" : "date",
             "type" : "string"
           },
+          "scholarshipAwardId" : {
+            "description" : "The award that gave the benefit; absent when no scholarship applied",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "scholarshipCode" : {
+            "description" : "The code of the scholarship of the award; absent when no scholarship applied",
+            "type" : [ "string", "null" ]
+          },
           "settled" : {
             "description" : "Derived, never stored: the charge is active and nothing is outstanding on it (a voided charge is not settled)",
             "type" : "boolean"
@@ -3745,7 +3861,7 @@
             "description" : "Present only when the charge is voided"
           }
         },
-        "required" : [ "base", "conceptCategory", "dueOn", "id", "origin", "outstanding", "paid", "paymentConceptId", "periodEnd", "periodLabel", "periodStart", "settled", "status", "tax", "total" ],
+        "required" : [ "base", "benefitAmount", "conceptCategory", "dueOn", "id", "netBase", "origin", "outstanding", "paid", "paymentConceptId", "periodEnd", "periodLabel", "periodStart", "settled", "status", "tax", "total" ],
         "type" : "object"
       },
       "StudentEnrollmentResponse" : {
@@ -4272,12 +4388,20 @@
           "base" : {
             "$ref" : "#/components/schemas/AccrualMoney"
           },
+          "benefitAmount" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What the scholarships take off the bases"
+          },
           "charges" : {
             "format" : "int32",
             "type" : "integer"
           },
           "currency" : {
             "type" : "string"
+          },
+          "netBase" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "The bases minus the benefits"
           },
           "tax" : {
             "$ref" : "#/components/schemas/AccrualMoney"
@@ -4286,7 +4410,7 @@
             "$ref" : "#/components/schemas/AccrualMoney"
           }
         },
-        "required" : [ "base", "charges", "currency", "tax", "total" ],
+        "required" : [ "base", "benefitAmount", "charges", "currency", "netBase", "tax", "total" ],
         "type" : "object"
       },
       "TransferEnrollmentRequest" : {
@@ -8737,6 +8861,107 @@
         "summary" : "Removes an item of a draft plan",
         "tags" : [ "charges-plans" ],
         "x-required-permission" : "charges:update"
+      }
+    },
+    "/api/v1/charges/plans/{planId}/simulation" : {
+      "get" : {
+        "description" : "For a student of the plan and a period of the plan, what the accrual would produce for each concept: the base, the scholarship applied, the net base, the tax and the total. It runs exactly the code of the accrual engine and writes nothing; the consultation is audited because the data are those of a minor. Needs the permission charges:read.",
+        "operationId" : "simulateChargeAccrual",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "planId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "The student whose charges are simulated",
+          "in" : "query",
+          "name" : "studentId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "The first day of a period of the plan (yyyy-MM-dd), as the periods of the plan list them",
+          "in" : "query",
+          "name" : "period",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChargeSimulationResponse"
+                }
+              }
+            },
+            "description" : "What the accrual would produce for the student"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "A parameter is missing or not valid, or the period is not one of the periods of the plan (validation-failed)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold charges:read (forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The plan or the student does not exist in the institution of the token, or the student is not enrolled in the target of the plan in that period (resource-not-found)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Simulates the charges of a student for a period",
+        "tags" : [ "charges-accrual" ],
+        "x-required-permission" : "charges:read"
       }
     },
     "/api/v1/charges/posting-accounts" : {
