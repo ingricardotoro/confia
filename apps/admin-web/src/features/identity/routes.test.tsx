@@ -118,6 +118,10 @@ describe("the routes and the screens", () => {
       "/payments",
       "/payments/$paymentId",
       "/payments/register",
+      "/scholarships",
+      "/scholarships/awards",
+      "/scholarships/awards/$awardId",
+      "/scholarships/list",
       "/students",
     ]);
   });

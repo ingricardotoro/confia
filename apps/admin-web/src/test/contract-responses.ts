@@ -1,4 +1,14 @@
 import { randomBytes } from "node:crypto";
+import {
+  AwardPageResponse,
+  AwardResponse,
+  ChargeSimulationResponse,
+  ScholarshipPageResponse,
+  ScholarshipResponse,
+  type AwardResponseOutput,
+  type ChargeSimulationResponseOutput,
+  type ScholarshipResponseOutput,
+} from "@confia/contracts/admin";
 import { PERMISSION_CODES } from "../shared/permissions/permission-codes.ts";
 import {
   AcademicYearPageResponse,
@@ -1309,4 +1319,98 @@ export function paymentPostingAccount(override: Partial<PaymentPostingAccountRes
 /** The map as `GET` and `PUT /payments/posting-accounts` answer it: the rows that were ever set. */
 export function paymentPostingAccountMap(items: readonly unknown[]): ContractResponse {
   return { status: 200, body: checked("payment posting account map", PaymentPostingAccountMapResponse, { items }), contentType: JSON_TYPE };
+}
+
+// The scholarships cut (scholarships-awards): the scholarships, the awards and the simulation of charges, checked against the generated contract.
+
+/** One scholarship as the API answers it: a percentage one that covers the tuition and has no cap. */
+export function scholarship(override: Partial<ScholarshipResponseOutput> = {}): ScholarshipResponseOutput {
+  return checked("ScholarshipResponse", ScholarshipResponse, {
+    id: crypto.randomUUID(),
+    code: "BECA25",
+    name: "Beca de excelencia",
+    benefitType: "PERCENTAGE",
+    percent: "25.00",
+    concepts: [{ id: "00000000-0000-4000-8000-000000007001", code: "MENS", name: "Mensualidad" }],
+    active: true,
+    benefitLocked: false,
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+export function scholarshipRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("scholarship record", ScholarshipResponse, row), contentType: JSON_TYPE };
+}
+
+export function scholarshipPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("scholarships page", ScholarshipPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** One award as the API answers it: pending, for a student and a scholarship, within an academic year. */
+export function award(override: Partial<AwardResponseOutput> = {}): AwardResponseOutput {
+  return checked("AwardResponse", AwardResponse, {
+    id: crypto.randomUUID(),
+    studentId: "00000000-0000-4000-8000-0000000000b1",
+    studentCode: "EST-0001",
+    scholarshipId: "00000000-0000-4000-8000-0000000e0001",
+    scholarshipCode: "BECA25",
+    scholarshipName: "Beca de excelencia",
+    academicYearId: "00000000-0000-4000-8000-000000000a01",
+    validFrom: "2027-01-01",
+    validTo: "2027-12-31",
+    status: "pending",
+    requestedAt: STAMP,
+    requestedBy: "00000000-0000-4000-8000-0000000000a1",
+    ...override,
+  });
+}
+
+export function awardRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("award record", AwardResponse, row), contentType: JSON_TYPE };
+}
+
+export function awardPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("awards page", AwardPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/**
+ * What the simulator answers for the acceptance example of the cut (docs/cortes/scholarships-awards.md): a tuition base of L 1,100.00, a scholarship of
+ * 25 % that takes L 275.00 off, a net base of L 825.00 and a tax of L 123.75 (the total L 948.75). The server computed every one of them.
+ */
+export function chargeSimulation(override: Partial<ChargeSimulationResponseOutput> = {}): ChargeSimulationResponseOutput {
+  return checked("ChargeSimulationResponse", ChargeSimulationResponse, {
+    planId: "00000000-0000-4000-8000-000000000c01",
+    studentId: "00000000-0000-4000-8000-0000000000b1",
+    periodStart: "2027-02-01",
+    periodLabel: "2027-02",
+    lines: [
+      {
+        paymentConceptId: "00000000-0000-4000-8000-000000007001",
+        outcome: "CREATED",
+        base: MONEY("1100.00"),
+        scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001",
+        scholarshipCode: "BECA25",
+        benefitAmount: MONEY("275.00"),
+        netBase: MONEY("825.00"),
+        tax: MONEY("123.75"),
+        total: MONEY("948.75"),
+      },
+    ],
+    ...override,
+  });
+}
+
+export function chargeSimulationRecord(row: unknown): ContractResponse {
+  return { status: 200, body: checked("charge simulation", ChargeSimulationResponse, row), contentType: JSON_TYPE };
 }

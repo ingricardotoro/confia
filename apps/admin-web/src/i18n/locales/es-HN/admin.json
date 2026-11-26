@@ -118,7 +118,11 @@
     "duplicateTransferReference": "Esa referencia de ese banco ya está registrada en otro pago. Revise la referencia o consulte la lista de pagos.",
     "selfApprovalForbidden": "Quien registró el pago no puede confirmarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise.",
     "paymentNotDeclared": "Este pago ya no está pendiente de confirmación, así que no se hizo ningún cambio. El detalle ya se actualizó.",
-    "chargeHasPayments": "Este cargo ya tiene pagos aplicados y no se puede anular. Primero hay que reversar el pago."
+    "chargeHasPayments": "Este cargo ya tiene pagos aplicados y no se puede anular. Primero hay que reversar el pago.",
+    "duplicateScholarshipCode": "Ya existe una beca con ese código.",
+    "scholarshipBenefitLocked": "Esta beca ya tiene otorgamientos aprobados, por lo que su tipo y su valor no se pueden cambiar. Cree otra beca con el nuevo valor y los cargos ya emitidos seguirán explicándose con la beca que tenían.",
+    "scholarshipAwardOverlap": "El estudiante ya tiene aprobado un otorgamiento de esta beca con fechas que se cruzan con las de este. Ajuste la vigencia o revoque el otorgamiento anterior.",
+    "invalidAwardState": "El otorgamiento ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -204,7 +208,10 @@
     "cashbox": "Mi caja",
     "cashSessions": "Sesiones de caja",
     "payments": "Pagos",
-    "paymentsRegister": "Cobrar"
+    "paymentsRegister": "Cobrar",
+    "scholarships": "Becas",
+    "awards": "Otorgamientos",
+    "simulator": "Simulador de cargos"
   },
   "catalog": {
     "title": "Catálogo",
@@ -701,7 +708,9 @@
         "errorsHeading": "Errores esperados",
         "errorsDescription": "Estos renglones no se generarían. Quedan registrados en la ejecución con su código.",
         "errorCount": "{count, plural, one {# renglón} other {# renglones}}",
-        "errorLead": "{name}: {count}."
+        "errorLead": "{name}: {count}.",
+        "benefit": "Becas",
+        "netBase": "Base neta"
       },
       "blockers": {
         "heading": "La generación no se puede confirmar todavía",
@@ -732,7 +741,11 @@
         "emptyFilteredTitle": "Ningún renglón coincide con el filtro",
         "emptyFilteredDescription": "Cambie el filtro para ver los demás renglones.",
         "emptyFilteredAction": "Mostrar todos los renglones",
-        "pagination": "Páginas de los renglones de la vista previa"
+        "pagination": "Páginas de los renglones de la vista previa",
+        "scholarship": "Beca",
+        "noScholarship": "Sin beca",
+        "benefit": "Beneficio",
+        "netBase": "Base neta"
       },
       "studentLabel": "{name} ({code})",
       "conceptLabel": "{code}, {name}",
@@ -782,7 +795,8 @@
         "errorsNote": "{count, plural, one {# renglón con error no se generará} other {# renglones con error no se generarán}}: quedan registrados en la ejecución.",
         "retryNote": "Si la solicitud no llegó a confirmarse, puede intentarlo de nuevo: no se duplicarán los cargos.",
         "confirm": "Generar cargos",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "benefitLine": "Becas aplicadas:"
       },
       "statuses": {
         "QUEUED": "En cola",
@@ -886,7 +900,10 @@
         "paid": "Pagado",
         "outstanding": "Pendiente",
         "status": "Estado",
-        "actions": "Acciones"
+        "actions": "Acciones",
+        "scholarship": "Beca",
+        "benefit": "Beneficio",
+        "netBase": "Base neta"
       },
       "statuses": {
         "ACTIVE": "Vigente",
@@ -921,7 +938,8 @@
       "voidActionFor": "Anular el cargo {concept}, {period}",
       "voidedOn": "Anulado el {date}",
       "voidedNotice": "Se anuló el cargo {concept}, {period}. Su reverso ya está en el libro mayor.",
-      "noConcept": "Concepto sin nombre"
+      "noConcept": "Concepto sin nombre",
+      "noScholarship": "Sin beca"
     },
     "void": {
       "title": "Anular cargo",
@@ -1097,7 +1115,8 @@
         "REVENUE_FINE": "Ingreso por multas",
         "REVENUE_OTHER": "Otros ingresos",
         "CASH": "Caja (efectivo)",
-        "BANK": "Banco (transferencias)"
+        "BANK": "Banco (transferencias)",
+        "BENEFITS": "Becas y descuentos"
       },
       "help": {
         "RECEIVABLE": "Se elige entre las cuentas activas de tipo Activo que llevan los saldos de los estudiantes. Cada cargo la debita.",
@@ -1105,7 +1124,8 @@
         "REVENUE_DEFAULT": "Se elige entre las cuentas activas de tipo Ingreso. La usan las categorías que no tienen una cuenta propia.",
         "REVENUE": "Se elige entre las cuentas activas de tipo Ingreso. Si se deja sin configurar, la categoría usa el ingreso por defecto.",
         "CASH": "Se elige entre las cuentas activas de tipo Activo que no llevan saldos de estudiantes. Cada pago en efectivo la debita.",
-        "BANK": "Se elige entre las cuentas activas de tipo Activo que no llevan saldos de estudiantes. Cada transferencia confirmada la debita."
+        "BANK": "Se elige entre las cuentas activas de tipo Activo que no llevan saldos de estudiantes. Cada transferencia confirmada la debita.",
+        "BENEFITS": "Se elige entre las cuentas activas de tipo Ingreso (que resta del ingreso) o de tipo Gasto que no llevan saldos de estudiantes. Se debita con el beneficio de las becas de cada cargo. Solo hace falta para los períodos que tengan becas aplicables."
       },
       "status": {
         "set": "Configurada",
@@ -1338,7 +1358,9 @@
     "statementAction": "Estado de cuenta",
     "statementActionFor": "Estado de cuenta de {name}",
     "chargesAction": "Cargos",
-    "chargesActionFor": "Cargos de {name}"
+    "chargesActionFor": "Cargos de {name}",
+    "awardsAction": "Becas",
+    "awardsActionFor": "Becas de {name}"
   },
   "enrollments": {
     "title": "Matrículas",
@@ -2270,6 +2292,217 @@
       "submit": "Rechazar transferencia",
       "sending": "Rechazando la transferencia.",
       "rejectedNotice": "La transferencia quedó rechazada. El saldo del estudiante no cambió."
+    }
+  },
+  "scholarships": {
+    "title": "Becas",
+    "errors": {
+      "duplicateCode": "Ya existe una beca con ese código.",
+      "selfApproval": "Quien solicitó el otorgamiento no puede aprobarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise."
+    },
+    "statuses": {
+      "pending": "Pendiente de aprobación",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "revoked": "Revocado"
+    },
+    "decisionKinds": {
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "revoked": "Revocado"
+    },
+    "benefitTypes": {
+      "PERCENTAGE": "Porcentaje",
+      "FIXED_AMOUNT": "Monto fijo"
+    },
+    "reasonHelp": "De {min} a {max} caracteres. No escriba datos personales.",
+    "list": {
+      "heading": "Becas",
+      "description": "Las becas de la institución. Una beca aprobada para un estudiante reduce la base de los cargos que se generen desde entonces; no se borra, se desactiva.",
+      "caption": "Becas de la institución",
+      "loadFailed": "No se pudieron cargar las becas",
+      "emptyTitle": "Todavía no hay becas",
+      "emptyDescription": "Defina una beca para poder solicitar su otorgamiento a un estudiante.",
+      "emptyAction": "Crear una beca",
+      "create": "Crear beca",
+      "filterBenefitType": "Tipo de beneficio",
+      "filterActive": "Estado",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "benefitType": "Tipo",
+        "benefit": "Beneficio",
+        "periodCap": "Tope por período",
+        "concepts": "Conceptos que cubre"
+      },
+      "percentValue": "{percent} %",
+      "noCap": "Sin tope"
+    },
+    "form": {
+      "createTitle": "Crear una beca",
+      "createDescription": "Defina el beneficio y los conceptos que cubre. Se aplica a los cargos que se generen después de aprobar un otorgamiento.",
+      "editTitle": "Editar la beca",
+      "editDescription": "El código no cambia. El tipo y el valor del beneficio solo se pueden cambiar mientras la beca no tenga otorgamientos aprobados.",
+      "code": "Código",
+      "codeHelp": "Letras, números, guion y guion bajo, hasta 30 caracteres. No se puede cambiar después.",
+      "name": "Nombre",
+      "benefitLocked": "Esta beca ya tiene otorgamientos aprobados: su tipo y su valor no se pueden cambiar. Para otro valor, cree otra beca.",
+      "benefitType": "Tipo de beneficio",
+      "fixedAmount": "Monto fijo por cargo",
+      "fixedAmountHelp": "En lempiras, mayor que cero y con hasta dos decimales, por ejemplo 250.00.",
+      "percent": "Porcentaje",
+      "percentHelp": "Mayor que 0 y hasta 100, con hasta dos decimales, por ejemplo 25 o 33.33.",
+      "periodCap": "Tope por período",
+      "periodCapHelp": "Opcional. Lo más que la beca descuenta en un período, en lempiras. Déjelo vacío para no poner tope.",
+      "noConcepts": "No hay conceptos de pago activos. Cree uno en el catálogo para poder elegirlo.",
+      "concepts": "Conceptos que cubre",
+      "conceptsHelp": "Elija uno o más. La beca solo se aplica a los cargos de estos conceptos.",
+      "conceptOption": "{code} · {name}"
+    },
+    "awards": {
+      "heading": "Otorgamientos",
+      "description": "Las becas solicitadas para cada estudiante. Quien solicita un otorgamiento no puede aprobarlo: lo decide otra persona.",
+      "caption": "Otorgamientos de becas",
+      "loadFailed": "No se pudieron cargar los otorgamientos",
+      "emptyTitle": "Todavía no hay otorgamientos",
+      "emptyDescription": "Cuando se solicite una beca para un estudiante aparecerá aquí.",
+      "emptyAction": "Solicitar un otorgamiento",
+      "request": "Solicitar otorgamiento",
+      "filterStatus": "Estado",
+      "filterScholarship": "Beca",
+      "clearStudent": "Quitar estudiante",
+      "studentUnnamed": "Estudiante elegido",
+      "noValue": "—",
+      "requestedNotice": "Se solicitó el otorgamiento para el estudiante {student}. Queda pendiente hasta que otra persona lo apruebe.",
+      "columns": {
+        "requestedAt": "Solicitado",
+        "student": "Estudiante",
+        "scholarship": "Beca",
+        "validFrom": "Vigente desde",
+        "validTo": "Vigente hasta",
+        "status": "Estado"
+      }
+    },
+    "request": {
+      "title": "Solicitar un otorgamiento",
+      "description": "Elija al estudiante, la beca y la vigencia. El otorgamiento nace pendiente y otra persona lo aprueba.",
+      "submit": "Solicitar otorgamiento",
+      "sending": "Enviando la solicitud.",
+      "noScholarships": "No hay becas activas. Cree o active una beca para poder solicitar su otorgamiento.",
+      "scholarship": "Beca",
+      "academicYear": "Año lectivo",
+      "academicYearHelp": "La vigencia debe quedar dentro de este año.",
+      "validFrom": "Vigente desde",
+      "validTo": "Vigente hasta",
+      "validToHelp": "Este día cuenta como parte de la vigencia.",
+      "pendingNote": "La beca solo se aplica a los cargos que se generen después de aprobarla y dentro de su vigencia. Los cargos ya emitidos no cambian."
+    },
+    "detail": {
+      "heading": "Otorgamiento del estudiante {student}",
+      "back": "Volver a los otorgamientos",
+      "loading": "Cargando el otorgamiento.",
+      "loadFailed": "No se pudo cargar el otorgamiento",
+      "notFoundTitle": "No se encontró el otorgamiento",
+      "notFoundDescription": "No existe o no pertenece a esta institución. Vuelva a la lista de otorgamientos.",
+      "forbiddenTitle": "No tiene acceso a este otorgamiento",
+      "forbiddenDescription": "Su rol no incluye el permiso para ver los otorgamientos de becas. Si lo necesita para su trabajo, solicítelo a un administrador.",
+      "viewStudentAwards": "Ver otorgamientos del estudiante",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "revoke": "Revocar",
+      "pendingNote": "Este otorgamiento está pendiente de aprobación y todavía no cambia ningún cargo. Lo debe decidir una persona distinta de quien lo solicitó.",
+      "revokedNote": "Este otorgamiento fue revocado. Solo afecta los cargos que se generen desde entonces: los ya emitidos no cambian.",
+      "summaryHeading": "Resumen",
+      "decisionHeading": "Decisión",
+      "noValue": "—",
+      "validityValue": "Del {from} al {to}",
+      "fields": {
+        "student": "Estudiante",
+        "scholarship": "Beca",
+        "academicYear": "Año lectivo",
+        "validity": "Vigencia",
+        "requestedAt": "Solicitado",
+        "decision": "Decisión",
+        "decidedAt": "Fecha de la decisión",
+        "reason": "Motivo"
+      }
+    },
+    "approve": {
+      "title": "Aprobar el otorgamiento",
+      "description": "Desde la aprobación, la beca se aplica a los cargos que se generen dentro de su vigencia. Los cargos ya emitidos no cambian. La decisión queda registrada.",
+      "submit": "Aprobar otorgamiento",
+      "sending": "Aprobando el otorgamiento.",
+      "approvedNotice": "El otorgamiento quedó aprobado. Se aplicará a los cargos que se generen dentro de su vigencia."
+    },
+    "reject": {
+      "title": "Rechazar el otorgamiento",
+      "description": "El rechazo no cambia ningún cargo. Queda registrado y no se puede deshacer.",
+      "reason": "Motivo del rechazo",
+      "submit": "Rechazar otorgamiento",
+      "sending": "Rechazando el otorgamiento.",
+      "rejectedNotice": "El otorgamiento quedó rechazado. Ningún cargo cambió."
+    },
+    "revoke": {
+      "title": "Revocar el otorgamiento",
+      "description": "La revocación solo afecta los cargos que se generen desde ahora: los ya emitidos no cambian. Queda registrada y no se puede deshacer.",
+      "reason": "Motivo de la revocación",
+      "submit": "Revocar otorgamiento",
+      "sending": "Revocando el otorgamiento.",
+      "revokedNotice": "El otorgamiento quedó revocado. Solo afecta los cargos que se generen desde ahora."
+    },
+    "simulator": {
+      "heading": "Simulador de cargos",
+      "description": "Muestra, para un estudiante y un período, lo que resultaría de generar sus cargos: la base, la beca aplicada, la base neta, el impuesto y el total. No genera ni cambia nada.",
+      "selectionLabel": "Qué simular",
+      "plan": "Plan de cobro",
+      "choosePlan": "Elija un plan",
+      "planHelp": "Solo se ofrecen los planes activos.",
+      "period": "Período",
+      "choosePeriod": "Elija un período",
+      "periodHelp": "Se ofrecen los períodos que el plan genera.",
+      "periodOption": "{label}, vence el {dueOn}",
+      "conceptLabel": "{code} · {name}",
+      "simulate": "Simular",
+      "plansFailed": "No se pudieron cargar los planes",
+      "noPlansTitle": "No hay planes activos",
+      "noPlansDescription": "El simulador usa un plan activo. Active uno para poder simular sus cargos.",
+      "noPlansAction": "Ir a los planes de cobro",
+      "periodsFailed": "No se pudieron cargar los períodos del plan.",
+      "noPeriodsTitle": "El plan no tiene períodos",
+      "noPeriodsDescription": "Revise que el plan tenga conceptos y que su año lectivo tenga fechas.",
+      "lookupFailed": "No se pudieron cargar los nombres de los conceptos. Los renglones muestran «No disponible» en su lugar.",
+      "idleTitle": "Todavía no se ha simulado nada",
+      "idleDescription": "Elija un estudiante, un plan y un período, y pulse «Simular». Cada consulta queda registrada, porque son datos de un menor.",
+      "idleAction": "Elegir el plan",
+      "simulating": "Calculando la simulación.",
+      "simulationFailed": "No se pudo calcular la simulación",
+      "notEnrolledTitle": "El estudiante no está matriculado en ese plan",
+      "notEnrolledDescription": "El plan se aplica a otra modalidad, grado o sección, o el estudiante no estaba matriculado en ese período. Elija otro plan o período.",
+      "resultTitle": "Resultado de la simulación",
+      "resultDescription": "{plan}, período {period}",
+      "nothingWritten": "Es una simulación: no se generó ningún cargo ni se escribió nada en el libro mayor.",
+      "noAmount": "—",
+      "noScholarship": "Sin beca",
+      "caption": "Resultado de la simulación por concepto",
+      "emptyTitle": "El plan no genera cargos para este período",
+      "emptyDescription": "Ningún concepto del plan corresponde a este período.",
+      "emptyAction": "Elegir otro período",
+      "columns": {
+        "concept": "Concepto",
+        "base": "Base",
+        "scholarship": "Beca aplicada",
+        "benefit": "Beneficio",
+        "netBase": "Base neta",
+        "tax": "Impuesto",
+        "total": "Total",
+        "result": "Resultado"
+      },
+      "outcomes": {
+        "CREATED": "Se generaría",
+        "ALREADY_ACCRUED": "Ya generado",
+        "ALREADY_ACCRUED_OTHER_PLAN": "Generado por otro plan",
+        "ERROR": "Con error: {code}"
+      }
     }
   }
 }

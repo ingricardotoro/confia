@@ -49,6 +49,9 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "self-approval-forbidden",
   "payment-not-declared",
   "charge-has-payments",
+  "scholarship-benefit-locked",
+  "scholarship-award-overlap",
+  "invalid-award-state",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */
@@ -104,6 +107,10 @@ export function classifyOrganizationFailure(result: ApiFailureResult): AccessFai
   // The same for the code of a tax rate.
   if (result.kind === "problem" && result.problem.code === "duplicate-tax-rate-code") {
     return { kind: "fields", errors: [{ field: "code", reason: "duplicate-tax-rate-code" }] };
+  }
+  // The same for the code of a scholarship.
+  if (result.kind === "problem" && result.problem.code === "duplicate-scholarship-code") {
+    return { kind: "fields", errors: [{ field: "code", reason: "duplicate-scholarship-code" }] };
   }
   // The same for the code of an account of the chart.
   if (result.kind === "problem" && result.problem.code === "duplicate-account-code") {

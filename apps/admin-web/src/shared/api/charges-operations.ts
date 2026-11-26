@@ -8,6 +8,7 @@ import {
   ChargePlanItemResponse,
   ChargePlanPageResponse,
   ChargePlanResponse,
+  ChargeSimulationResponse,
   ChargeVoidResponse,
   IntegrityRunDetailResponse,
   IntegrityRunPageResponse,
@@ -26,6 +27,7 @@ import {
   type ChargePlanItemResponseOutput,
   type ChargePlanPageResponseOutput,
   type ChargePlanResponseOutput,
+  type ChargeSimulationResponseOutput,
   type ChargeVoidBody,
   type ChargeVoidResponseOutput,
   type CreateChargePlanRequest,
@@ -289,3 +291,22 @@ export const getLatestIntegrityRun = (token: string): Promise<ApiResult<Integrit
 
 export const getIntegrityRun = (token: string, runId: string): Promise<ApiResult<IntegrityRunDetail>> =>
   request({ method: "GET", path: `/api/v1/charges/integrity-runs/${encodeURIComponent(runId)}`, headers: bearer(token), schema: lenient(IntegrityRunDetailResponse) });
+
+// The simulator of charges (scholarships-awards cut): what accruing a period would give one student, by concept, with nothing written. It is the
+// same engine as the preview and the run, so every amount is the string the server computed and rounded; nothing here or after it adds,
+// subtracts or rounds one. The query of a student's data is audited by the server, so it is only asked for when the person asks.
+
+export type ChargeSimulation = ChargeSimulationResponseOutput;
+export type ChargeSimulationLine = ChargeSimulationResponseOutput["lines"][number];
+
+export interface ChargeSimulationParams {
+  readonly studentId: string;
+  /** `yyyy-MM-dd`: the first day of the period. */
+  readonly period: string;
+}
+
+/** The simulation of one period of a plan for one student. A student not enrolled in the target of the plan that period answers `404`. */
+export const simulateCharges = (token: string, planId: string, params: ChargeSimulationParams): Promise<ApiResult<ChargeSimulation>> => {
+  const query = new URLSearchParams({ studentId: params.studentId, period: params.period });
+  return request({ method: "GET", path: `${planPath(planId)}/simulation?${query.toString()}`, headers: bearer(token), schema: lenient(ChargeSimulationResponse) });
+};

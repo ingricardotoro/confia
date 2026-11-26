@@ -96,7 +96,7 @@ describe("what the staff sign in leaves out", () => {
 
     expect(operations.sort()).toEqual(["completeSecondFactor", "endCurrentSession", "enrollSecondFactor", "getCurrentSession", "logIn", "refreshSession"]);
     // The academic structure screens (organization-academic-structure) and the catalog (catalog-payment-concepts) add the one path of their client; the paths of the imports are built from the kind of file, so no literal shows.
-    expect(paths).toEqual(["/api/v1/auth/mfa/enrollments", "/api/v1/auth/mfa/verifications", "/api/v1/auth/sessions", "/api/v1/auth/sessions/current", "/api/v1/auth/sessions/refresh", "/api/v1/cashbox", "/api/v1/cashbox/sessions", "/api/v1/cashbox/sessions/current", "/api/v1/catalog", "/api/v1/charges", "/api/v1/charges/integrity-runs/latest", "/api/v1/charges/posting-accounts", "/api/v1/ledger", "/api/v1/organization", "/api/v1/payments", "/api/v1/payments/posting-accounts"]);
+    expect(paths).toEqual(["/api/v1/auth/mfa/enrollments", "/api/v1/auth/mfa/verifications", "/api/v1/auth/sessions", "/api/v1/auth/sessions/current", "/api/v1/auth/sessions/refresh", "/api/v1/cashbox", "/api/v1/cashbox/sessions", "/api/v1/cashbox/sessions/current", "/api/v1/catalog", "/api/v1/charges", "/api/v1/charges/integrity-runs/latest", "/api/v1/charges/posting-accounts", "/api/v1/ledger", "/api/v1/organization", "/api/v1/payments", "/api/v1/payments/posting-accounts", "/api/v1/scholarship-awards", "/api/v1/scholarships"]);
     expect(text(join(PACKAGE_ROOT, "src", "features", "identity", "routes.tsx"))).toMatch(
       /ACCESS_PATHS = \{\s*home: "\/",\s*signIn: "\/iniciar-sesion",\s*verification: "\/iniciar-sesion\/verificacion",\s*enrollment: "\/iniciar-sesion\/inscripcion",\s*\} as const/,
     );

@@ -69,5 +69,9 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "self-approval-forbidden": "problem.selfApprovalForbidden",
   "payment-not-declared": "problem.paymentNotDeclared",
   "charge-has-payments": "problem.chargeHasPayments",
+  "duplicate-scholarship-code": "problem.duplicateScholarshipCode",
+  "scholarship-benefit-locked": "problem.scholarshipBenefitLocked",
+  "scholarship-award-overlap": "problem.scholarshipAwardOverlap",
+  "invalid-award-state": "problem.invalidAwardState",
   unknown: "problem.unexpected",
 };
