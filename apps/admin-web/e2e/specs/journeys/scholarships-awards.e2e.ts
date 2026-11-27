@@ -86,7 +86,8 @@ test.describe("the awards of scholarships", () => {
     const after = page.getByRole("table", { name: "Resultado de la simulación por concepto" });
     const row = after.getByRole("row", { name: /BECA25/ });
     await expect(row.getByText("L 1,500.00")).toBeVisible();
-    await expect(row.getByText("L 375.00")).toBeVisible();
+    // The benefit of the scholarship is listed once as the line of the scholarship and once as the benefit of the charge.
+    await expect(row.getByText("L 375.00").first()).toBeVisible();
     await expect(row.getByText("L 1,125.00")).toBeVisible();
     await expect(row.getByText("L 168.75")).toBeVisible();
     await expect(row.getByText("L 1,293.75")).toBeVisible();

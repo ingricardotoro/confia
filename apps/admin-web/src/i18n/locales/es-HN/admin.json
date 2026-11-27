@@ -2462,7 +2462,7 @@
     },
     "simulator": {
       "heading": "Simulador de cargos",
-      "description": "Muestra, para un estudiante y un período, lo que resultaría de generar sus cargos: la base, la beca aplicada, la base neta, el impuesto y el total. No genera ni cambia nada.",
+      "description": "Muestra, para un estudiante y un período, lo que resultaría de generar sus cargos: la base, los beneficios aplicados (la beca y los descuentos), la base neta, el impuesto y el total. No genera ni cambia nada.",
       "selectionLabel": "Qué simular",
       "plan": "Plan de cobro",
       "choosePlan": "Elija un plan",

@@ -121,6 +121,8 @@ describe("the routes and the screens", () => {
       "/scholarships",
       "/scholarships/awards",
       "/scholarships/awards/$awardId",
+      "/scholarships/discount-assignments",
+      "/scholarships/discount-assignments/$assignmentId",
       "/scholarships/discounts",
       "/scholarships/list",
       "/scholarships/simulator",

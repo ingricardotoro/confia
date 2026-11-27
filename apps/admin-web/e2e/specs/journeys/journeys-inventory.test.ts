@@ -94,6 +94,7 @@ describe("the seven journeys of access", () => {
       "organization-states.e2e.ts",
       "payments-register.e2e.ts",
       "permissions.e2e.ts",
+      "scholarships-assignments.e2e.ts",
       "scholarships-awards.e2e.ts",
       "scholarships-discounts.e2e.ts",
       "second-factor.e2e.ts",

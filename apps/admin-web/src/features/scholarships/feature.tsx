@@ -4,11 +4,13 @@ import type { FeatureModule } from "../../shared/navigation/navigation-entry.ts"
 import { DEFAULT_PAGE_SIZE } from "../../shared/resource-screen/list-search.ts";
 import { useListSearch } from "../../shared/resource-screen/use-list-search.ts";
 import { AwardDetailContainer } from "./AwardDetailContainer.tsx";
+import { AssignmentDetailContainer } from "./AssignmentDetailContainer.tsx";
+import { AssignmentsContainer } from "./AssignmentsContainer.tsx";
 import { AwardsContainer } from "./AwardsContainer.tsx";
 import { DiscountsContainer } from "./DiscountsContainer.tsx";
 import { ScholarshipsAreaContainer } from "./ScholarshipsAreaContainer.tsx";
 import { ScholarshipsContainer } from "./ScholarshipsContainer.tsx";
-import { discountsSearch, type DiscountsSearch } from "./discounts-search.ts";
+import { assignmentsSearch, discountsSearch, type AssignmentsSearch, type DiscountsSearch } from "./discounts-search.ts";
 import { DISCOUNT_PATHS, SCHOLARSHIPS_PATH, SCHOLARSHIPS_PATHS } from "./scholarships-paths.ts";
 import {
   awardsSearch,
@@ -30,6 +32,17 @@ function ScholarshipsRoute() {
 function DiscountsRoute() {
   const [search, onSearchChange] = useListSearch<DiscountsSearch>((raw) => discountsSearch.parse(raw));
   return <DiscountsContainer search={search} onSearchChange={onSearchChange} />;
+}
+
+function AssignmentsRoute() {
+  const [search, onSearchChange] = useListSearch<AssignmentsSearch>((raw) => assignmentsSearch.parse(raw));
+  return <AssignmentsContainer search={search} onSearchChange={onSearchChange} />;
+}
+
+function AssignmentRoute() {
+  const params: unknown = useParams({ strict: false });
+  const { assignmentId } = z.object({ assignmentId: z.string().optional() }).parse(params);
+  return assignmentId === undefined ? null : <AssignmentDetailContainer assignmentId={assignmentId} />;
 }
 
 function AwardsRoute() {
@@ -62,7 +75,7 @@ function SimulatorRoute() {
 const below = (path: string): string => path.slice(SCHOLARSHIPS_PATH.length + 1);
 
 /**
- * What the scholarships register with the app: their entries in the side navigation and their routes, children of the signed in shell and so already
+ * What the scholarships register with the app (and, below them, the discounts and their agreement assignments): their entries in the side navigation and their routes, children of the signed in shell and so already
  * behind the session guard. `/scholarships` leads to the scholarships (the area has no page of its own); each list validates its own search (page,
  * size, order and filters), which lives in the address, and one award lives below the awards. The simulator of charges lives in the same area but only
  * reads the charges, so its entry and its route ask for `charges:read` (the longer prefix wins). The interface only hides; the server decides every
@@ -73,6 +86,7 @@ export const scholarshipsFeature: FeatureModule = {
   moreNavigation: [
     { id: "scholarships-awards", labelKey: "navigation.awards", to: SCHOLARSHIPS_PATHS.awards, group: "finance", permission: "scholarships:read" },
     { id: "scholarships-discounts", labelKey: "navigation.discounts", to: DISCOUNT_PATHS.discounts, group: "finance", permission: "scholarships:read" },
+    { id: "scholarships-discount-assignments", labelKey: "navigation.discountAssignments", to: DISCOUNT_PATHS.assignments, group: "finance", permission: "scholarships:read" },
     { id: "scholarships-simulator", labelKey: "navigation.simulator", to: SCHOLARSHIPS_PATHS.simulator, group: "finance", permission: "charges:read" },
   ],
   routePermissions: [
@@ -115,6 +129,14 @@ export const scholarshipsFeature: FeatureModule = {
           search,
           component: DiscountsRoute,
         }),
+        createRoute({
+          getParentRoute: () => area,
+          path: below(DISCOUNT_PATHS.assignments),
+          validateSearch: (raw: Record<string, unknown>) => assignmentsSearch.parse(raw),
+          search,
+          component: AssignmentsRoute,
+        }),
+        createRoute({ getParentRoute: () => area, path: `${below(DISCOUNT_PATHS.assignments)}/$assignmentId`, component: AssignmentRoute }),
         createRoute({
           getParentRoute: () => area,
           path: below(SCHOLARSHIPS_PATHS.simulator),

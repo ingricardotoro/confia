@@ -76,6 +76,7 @@ describe("the signed in shell", () => {
         "Becas",
         "Otorgamientos",
         "Descuentos",
+        "Asignaciones de convenio",
         "Simulador de cargos",
         "Mi caja",
         "Sesiones de caja",
