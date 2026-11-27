@@ -2,6 +2,11 @@ package com.confia.scholarships.infrastructure;
 
 import com.confia.scholarships.application.RequestKeyTakenException;
 import com.confia.scholarships.domain.AwardOverlapException;
+import com.confia.scholarships.domain.DiscountAssignmentOverlapException;
+import com.confia.scholarships.domain.DiscountBenefitLockedException;
+import com.confia.scholarships.domain.DiscountScopeLockedException;
+import com.confia.scholarships.domain.DuplicateDiscountCodeException;
+import com.confia.scholarships.domain.InvalidAssignmentStateException;
 import com.confia.scholarships.domain.DuplicateScholarshipCodeException;
 import com.confia.scholarships.domain.InactiveReferenceException;
 import com.confia.scholarships.domain.InvalidAwardStateException;
@@ -62,6 +67,9 @@ final class ScholarshipsWrites {
             case "scholarships_scholarship_code_uq" -> throw new DuplicateScholarshipCodeException();
             case "scholarships_award_decision_key_uq" -> throw new RequestKeyTakenException();
             case "scholarships_award_decision_kind_uq" -> throw new InvalidAwardStateException();
+            case "scholarships_discount_code_uq" -> throw new DuplicateDiscountCodeException();
+            case "scholarships_discount_decision_key_uq" -> throw new RequestKeyTakenException();
+            case "scholarships_discount_decision_kind_uq" -> throw new InvalidAssignmentStateException();
             default -> throw e;
         }
     }
@@ -69,6 +77,9 @@ final class ScholarshipsWrites {
     private static void exclusion(String constraint, DataAccessException e) {
         if ("scholarships_award_overlap_excl".equals(constraint)) {
             throw new AwardOverlapException();
+        }
+        if ("scholarships_discount_assignment_overlap_excl".equals(constraint)) {
+            throw new DiscountAssignmentOverlapException();
         }
         throw e;
     }
@@ -80,6 +91,12 @@ final class ScholarshipsWrites {
         if ("scholarships_scholarship_scope_locked_chk".equals(constraint)) {
             throw new ScholarshipScopeLockedException();
         }
+        if ("scholarships_discount_benefit_locked_chk".equals(constraint)) {
+            throw new DiscountBenefitLockedException();
+        }
+        if ("scholarships_discount_scope_locked_chk".equals(constraint)) {
+            throw new DiscountScopeLockedException();
+        }
         throw e;
     }
 
@@ -90,12 +107,22 @@ final class ScholarshipsWrites {
             case "scholarships_award_scholarship_active_chk" -> throw new InactiveReferenceException();
             case "scholarships_award_decision_self_chk" -> throw new SelfApprovalForbiddenException();
             case "scholarships_award_decision_state_chk" -> throw new InvalidAwardStateException();
+            case "scholarships_discount_assignment_active_chk" -> throw new InactiveReferenceException();
+            case "scholarships_discount_assignment_kind_chk" -> throw new InvalidScholarshipsValueException("discountId",
+                    "not-agreement");
+            case "scholarships_discount_assignment_in_validity_chk" -> throw new InvalidScholarshipsValueException("validFrom",
+                    "outside-discount-validity");
+            case "scholarships_discount_validity_assignments_chk" -> throw new InvalidScholarshipsValueException("validTo",
+                    "assignments-outside-validity");
+            case "scholarships_discount_decision_self_chk" -> throw new SelfApprovalForbiddenException();
+            case "scholarships_discount_decision_state_chk" -> throw new InvalidAssignmentStateException();
             default -> throw e;
         }
     }
 
     private static void foreignKey(String constraint, DataAccessException e) {
-        if ("scholarships_scholarship_concept_concept_fk".equals(constraint)) {
+        if ("scholarships_scholarship_concept_concept_fk".equals(constraint)
+                || "scholarships_discount_concept_concept_fk".equals(constraint)) {
             throw new InvalidScholarshipsValueException("conceptIds", "not-found");
         }
         throw e;

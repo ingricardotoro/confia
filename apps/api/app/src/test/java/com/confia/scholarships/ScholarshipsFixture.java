@@ -4,11 +4,18 @@ import com.confia.catalog.infrastructure.JooqPaymentConceptDirectory;
 import com.confia.charges.ChargesLedgerFixture;
 import com.confia.organization.infrastructure.JooqAcademicStructureDirectory;
 import com.confia.scholarships.application.DecideAward;
+import com.confia.scholarships.application.DecideDiscountAssignment;
+import com.confia.scholarships.application.ManageDiscounts;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
+import com.confia.scholarships.application.RequestDiscountAssignment;
 import com.confia.scholarships.application.ViewAwards;
+import com.confia.scholarships.application.ViewDiscountAssignments;
+import com.confia.scholarships.infrastructure.JooqAssignmentDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqAwardDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqAwardRepository;
+import com.confia.scholarships.infrastructure.JooqDiscountAssignmentRepository;
+import com.confia.scholarships.infrastructure.JooqDiscountRepository;
 import com.confia.scholarships.infrastructure.JooqScholarshipRepository;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
 import com.confia.shared.security.AuthenticatedActor;
@@ -73,5 +80,28 @@ public abstract class ScholarshipsFixture extends ChargesLedgerFixture {
                 return (UUID) rs.getObject(1);
             }
         }
+    }
+
+    protected ManageDiscounts manageDiscounts() {
+        return new ManageDiscounts(transactionRunner(), new JooqDiscountRepository(dsl), new JooqDiscountAssignmentRepository(dsl),
+                new JooqPaymentConceptDirectory(dsl), new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    protected RequestDiscountAssignment requestAssignment() {
+        return new RequestDiscountAssignment(transactionRunner(), new JooqDiscountRepository(dsl),
+                new JooqDiscountAssignmentRepository(dsl), new JooqAssignmentDecisionRepository(dsl),
+                new JooqStudentDirectory(dsl), new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    protected DecideDiscountAssignment decideAssignment() {
+        return new DecideDiscountAssignment(transactionRunner(), new JooqDiscountRepository(dsl),
+                new JooqDiscountAssignmentRepository(dsl), new JooqAssignmentDecisionRepository(dsl),
+                new JooqStudentDirectory(dsl), new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    protected ViewDiscountAssignments viewAssignments() {
+        return new ViewDiscountAssignments(transactionRunner(), new JooqDiscountRepository(dsl),
+                new JooqDiscountAssignmentRepository(dsl), new JooqAssignmentDecisionRepository(dsl),
+                new JooqStudentDirectory(dsl));
     }
 }

@@ -1,5 +1,7 @@
 /**
  * The public API of {@code scholarships} for the module that accrues charges: {@link
+ * com.confia.scholarships.application.api.DiscountBenefits}, the read-only view of what the discounts in force of a student offer on a
+ * charge (docs/cortes/scholarships-discounts.md), and {@link
  * com.confia.scholarships.application.api.AwardBenefits}, the read-only view of what the approved awards in force of a student offer
  * on a charge (docs/cortes/scholarships-awards.md), with the plain types it answers (no type of the scholarships domain crosses the
  * boundary).
