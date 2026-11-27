@@ -281,7 +281,7 @@ public class AccrualController {
                         item.outcome().name(), item.error(),
                         AccrualMoney.of(item.base()), AccrualMoney.of(item.benefit()), AccrualMoney.of(item.netBase()),
                         AccrualMoney.of(item.tax()), AccrualMoney.of(item.total()), item.awardId(), item.scholarshipCode(),
-                        item.existingChargeId()))
+                        item.existingChargeId(), AppliedBenefitResponse.of(item.benefits())))
                 .toList();
         return new AccrualPreviewResponse(preview.planId(), preview.periodStart(), preview.studentsEvaluated(),
                 preview.toCreate(), preview.alreadyAccrued(), preview.alreadyAccruedOtherPlan(), preview.errors(), totals,

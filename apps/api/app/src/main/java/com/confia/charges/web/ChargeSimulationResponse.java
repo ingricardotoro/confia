@@ -30,7 +30,7 @@ public record ChargeSimulationResponse(
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) String errorCode,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) AccrualMoney base,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
-                    description = "What the scholarship takes off the base; zero when none applies") AccrualMoney benefitAmount,
+                    description = "What the benefits (scholarship and discounts) take off the base; zero when none applies") AccrualMoney benefitAmount,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
                     description = "The base minus the benefit: what the tax is computed on") AccrualMoney netBase,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
@@ -40,6 +40,9 @@ public record ChargeSimulationResponse(
             String scholarshipCode,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) AccrualMoney tax,
             @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) AccrualMoney total,
-            @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) UUID existingChargeId) {
+            @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true) UUID existingChargeId,
+            @Schema(requiredMode = RequiredMode.REQUIRED,
+                    description = "Every benefit that reduces the charge, scholarship and discounts, in the order they apply; empty when none")
+            List<AppliedBenefitResponse> benefits) {
     }
 }

@@ -4,7 +4,6 @@ import com.confia.catalog.application.directory.PricingDirectory;
 import com.confia.charges.domain.AccrualErrorCode;
 import com.confia.charges.domain.AccrualPeriod;
 import com.confia.charges.domain.AccrualPeriods;
-import com.confia.charges.domain.AppliedBenefit;
 import com.confia.charges.domain.ChargePlan;
 import com.confia.charges.domain.ChargePlanItem;
 import com.confia.charges.domain.InvalidChargesValueException;
@@ -61,7 +60,7 @@ public final class SimulateCharges {
     /** One concept of the period and what the engine found for the student. The amounts are present only for a charge to create. */
     public record Line(UUID paymentConceptId, AccrualOutcome outcome, AccrualErrorCode errorCode, Money base, Money benefit,
             Money netBase, UUID scholarshipAwardId, String scholarshipCode, Money tax, Money total, UUID existingChargeId,
-            List<AppliedBenefit> benefits) {
+            List<AppliedBenefitView> benefits) {
 
         public Line {
             benefits = benefits == null ? List.of() : List.copyOf(benefits);
@@ -125,6 +124,6 @@ public final class SimulateCharges {
         var benefit = charge.benefit();
         return new Line(line.paymentConceptId(), line.outcome(), null, charge.amounts().base(), charge.amounts().discount(),
                 charge.netBase(), benefit == null ? null : benefit.awardId(), benefit == null ? null : benefit.scholarshipCode(),
-                charge.amounts().tax(), charge.amounts().total(), null, charge.benefits());
+                charge.amounts().tax(), charge.amounts().total(), null, AppliedBenefitView.of(charge.benefits()));
     }
 }

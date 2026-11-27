@@ -1,6 +1,5 @@
 package com.confia.charges.application;
 
-import com.confia.charges.domain.AppliedBenefit;
 import com.confia.charges.domain.ChargeStatus;
 import com.confia.kernel.Money;
 import java.time.Instant;
@@ -18,14 +17,14 @@ import java.util.UUID;
 public record ChargeRow(UUID id, UUID paymentConceptId, String conceptCategory, String periodLabel,
         LocalDate periodStart, LocalDate periodEnd, LocalDate dueOn, String origin, Money base, Money benefit, Money netBase,
         UUID scholarshipAwardId, String scholarshipCode, Money tax, Money total, VoidInfo voided,
-        List<AppliedBenefit> benefits) {
+        List<AppliedBenefitView> benefits) {
 
     public ChargeRow {
         benefits = benefits == null ? List.of() : List.copyOf(benefits);
     }
 
     /** The same charge with the benefits that reduced it. */
-    public ChargeRow withBenefits(List<AppliedBenefit> applied) {
+    public ChargeRow withBenefits(List<AppliedBenefitView> applied) {
         return new ChargeRow(id, paymentConceptId, conceptCategory, periodLabel, periodStart, periodEnd, dueOn, origin, base,
                 benefit, netBase, scholarshipAwardId, scholarshipCode, tax, total, voided, applied);
     }

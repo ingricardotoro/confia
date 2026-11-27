@@ -2,7 +2,6 @@ package com.confia.charges.application;
 
 import com.confia.charges.domain.AccrualErrorCode;
 import com.confia.charges.domain.AccrualRejection;
-import com.confia.charges.domain.AppliedBenefit;
 import com.confia.kernel.Money;
 import java.time.LocalDate;
 import java.util.List;
@@ -51,7 +50,7 @@ public record AccrualPreviewResult(UUID planId, LocalDate periodStart, int stude
      */
     public record Item(UUID studentId, UUID paymentConceptId, AccrualOutcome outcome, AccrualErrorCode errorCode,
             Money base, Money benefit, Money netBase, Money tax, Money total, UUID awardId, String scholarshipCode,
-            UUID existingChargeId, List<AppliedBenefit> benefits) {
+            UUID existingChargeId, List<AppliedBenefitView> benefits) {
 
         public Item {
             benefits = benefits == null ? List.of() : List.copyOf(benefits);

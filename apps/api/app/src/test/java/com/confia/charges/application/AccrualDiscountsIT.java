@@ -3,7 +3,7 @@ package com.confia.charges.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.confia.charges.domain.AppliedBenefit;
+import com.confia.charges.application.AppliedBenefitView;
 import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
@@ -279,7 +279,7 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
             assertAmount(item.tax().amount(), "108.00");
             assertAmount(item.total().amount(), "828.00");
             assertThat(item.awardId()).isEqualTo(award);
-            assertThat(item.benefits()).extracting(AppliedBenefit::code).containsExactly("BECA-20", "CAMP-10");
+            assertThat(item.benefits()).extracting(AppliedBenefitView::code).containsExactly("BECA-20", "CAMP-10");
             assertThat(item.benefits().get(1).discountId()).isEqualTo(discount);
             assertThat(item.benefits().get(1).assignmentId()).isNull();
         });
@@ -289,7 +289,7 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
             assertAmount(line.netBase().amount(), "720.00");
             assertAmount(line.tax().amount(), "108.00");
             assertAmount(line.total().amount(), "828.00");
-            assertThat(line.benefits()).extracting(AppliedBenefit::code).containsExactly("BECA-20", "CAMP-10");
+            assertThat(line.benefits()).extracting(AppliedBenefitView::code).containsExactly("BECA-20", "CAMP-10");
             assertThat(line.benefits()).extracting(benefit -> benefit.amount().toPlainString())
                     .containsExactly("200.0000", "80.0000");
         });
@@ -313,7 +313,7 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
 
         assertThat(simulation.lines()).singleElement().satisfies(line -> {
             assertAmount(line.netBase().amount(), "750.00");
-            assertThat(line.benefits()).extracting(AppliedBenefit::code).containsExactly("CAMP-25");
+            assertThat(line.benefits()).extracting(AppliedBenefitView::code).containsExactly("CAMP-25");
             assertThat(line.scholarshipAwardId()).isNull();
         });
     }
@@ -696,7 +696,7 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
             assertAmount(row.benefit().amount(), "280.00");
             assertAmount(row.netBase().amount(), "720.00");
             assertThat(row.scholarshipAwardId()).isEqualTo(award);
-            assertThat(row.benefits()).extracting(AppliedBenefit::code).containsExactly("BECA-20", "CAMP-10");
+            assertThat(row.benefits()).extracting(AppliedBenefitView::code).containsExactly("BECA-20", "CAMP-10");
             assertAmount(view.outstanding().amount(), "828.00");
         });
         integrityCheck().runFor(new InstitutionId(w.institution()), new com.confia.shared.jobs.RecurringRun(
