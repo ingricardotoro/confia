@@ -321,3 +321,42 @@ actualiza ni borra ninguna fila; V39 y V40 no se tocan porque las bases locales 
 - Un descuento de campaña rechazado conserva su código (no se reutiliza) y nunca se edita; se crea otro.
 - Reactivar un descuento de convenio y desactivar y reactivar un descuento con asignaciones pendientes sube su versión: esas asignaciones se
   rechazan o se solicitan otra vez antes de aprobarse.
+
+## Lo construido (frontend T4, segunda parte, 2026-11-27)
+
+`packages/contracts` se regeneró con `pnpm --filter @confia/contracts generate` (fuera de Git). Cambios en `apps/admin-web`:
+
+- **Descuentos, estados de aprobación (S7).** La columna «Estado» de la lista dice, además de activo o inactivo, lo que el descuento espera: «Pendiente de
+  aprobación» (una campaña recién creada, que no se aplica a nada), «Propuesta pendiente» (con los términos propuestos junto a los vigentes: beneficio,
+  vigencia y, si la propuesta reactiva, que lo hace) y «Rechazado». No se agregó una columna: la tabla ya era ancha y una más desplaza las primeras columnas
+  fuera de la vista (lo vio la compuerta de axe como contraste «parcialmente cubierto»). Mientras espera o está rechazado no se ofrece Editar ni Activar
+  (`409 discount-pending-approval` si el servidor lo recibe igual); Desactivar sí. Tras crear una campaña, tras ampliarla o tras pedir su reactivación, el aviso
+  dice que quedó pendiente o que se envió la propuesta y que los términos vigentes siguen aplicándose, no «se creó» ni «se activó». El formulario de una
+  campaña lo advierte.
+- **Aprobar y rechazar un descuento.** Dos botones por fila (`Aprobar {nombre}`, `Rechazar {nombre}`) con permiso `scholarships:approve`, y dos diálogos
+  explícitos que repiten lo que se decide (los términos de la creación, o los vigentes junto a los propuestos). Mandan `{ version }` y `{ version, reason }`
+  (20 a 500 caracteres) con la `Idempotency-Key` del intento: se conserva mientras el resultado es desconocido y se renueva tras un rechazo definitivo. Es el
+  mismo ayudante que las asignaciones (`useDecisionIntent`, que ahora comparten ambos contenedores). Los botones se ocultan a quien creó el descuento o
+  propuso el cambio (`createdBy` o `pendingChange.requestedBy` contra la cuenta de la sesión, que ahora viaja en `usePermissions().accountId`); es solo
+  presentación y el servidor sigue respondiendo `403 self-approval-forbidden`, con su propio texto. Nada es optimista: tras confirmar se vuelven a leer los
+  descuentos y las asignaciones.
+- **«Acumulable» de solo lectura (S8).** Con `inUse` el campo se muestra como texto («Acumulable» o «No acumulable») igual que el tipo y el valor, y el
+  `discount-benefit-locked` dice ahora que cubre también esa marca.
+- **Asignaciones, términos solicitados (H2).** El detalle y los tres diálogos de decisión muestran «Beneficio solicitado» y «Versión del descuento» (de
+  `benefitType`, `percent`, `fixedAmount` y `discountVersion`). Una asignación sin términos (de antes de V41) lo dice y avisa que no se puede aprobar. Aprobar
+  puede responder `409 discount-terms-changed`: el diálogo dice que se rechace y se solicite de nuevo, y la asignación se vuelve a leer.
+- **Códigos de problema** `discount-pending-approval`, `invalid-discount-change-state` y `discount-terms-changed`, con su texto en el catálogo.
+- **Inventarios y API simulada.** La matriz de accesibilidad agrega los diálogos de aprobar y rechazar un descuento y la propuesta pendiente. La API simulada
+  de Playwright repite las reglas nuevas (campaña pendiente, propuesta, decisión con versión y clave, términos de la asignación, `stackable` bloqueada) y la
+  cuenta de la sesión simulada es ahora la persona que usan los demás modelos (`ME`). Recorridos: `scholarships-discounts.e2e.ts` (crear una campaña que queda
+  pendiente, aprobar la de otra persona, rechazar con motivo, proponer una ampliación) y `scholarships-assignments.e2e.ts` (términos solicitados y
+  `discount-terms-changed`). Sin archivos `*.e2e.ts` nuevos, así que el inventario de recorridos no cambia.
+
+### Desviaciones y pendientes
+
+- La cuenta de la sesión (`accountId`) se compara con `createdBy` y `requestedBy` suponiendo que son el mismo identificador de la cuenta, como en las
+  asignaciones del servidor (`requested_by = app.actor_id`). Si no coincidieran, el botón se vería y el servidor respondería 403 con su texto.
+- Los recorridos de Playwright no analizan con axe los diálogos recién abiertos ni la lista justo después de desactivar (un análisis en esos instantes ve
+  la capa del diálogo o el desplazamiento del aviso como contraste «parcialmente cubierto»): lo cubren las combinaciones de la matriz de la compuerta, que
+  aísla el diálogo y espera a que cierre.
+- Las pruebas de componente se escribieron después del código; el rojo se observó por mutación (ver el registro de la tarea).
