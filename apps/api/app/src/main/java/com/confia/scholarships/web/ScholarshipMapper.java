@@ -1,10 +1,12 @@
 package com.confia.scholarships.web;
 
+import com.confia.scholarships.application.AssignmentView;
 import com.confia.scholarships.application.AwardView;
+import com.confia.scholarships.application.DiscountView;
 import com.confia.scholarships.application.Page;
 import com.confia.scholarships.application.ScholarshipView;
 
-/** The output DTO of every route of the scholarships and their awards. Every amount is rounded by the server to the minor unit. */
+/** The output DTO of every route of the scholarships, their awards, the discounts and their assignments. Every amount is rounded by the server to the minor unit. */
 final class ScholarshipMapper {
 
     private ScholarshipMapper() {
@@ -35,6 +37,34 @@ final class ScholarshipMapper {
 
     private static AwardDecisionResponse decision(AwardView.DecisionView decision) {
         return decision == null ? null : new AwardDecisionResponse(decision.id(), decision.kind(), decision.decidedBy(),
+                decision.decidedAt(), decision.reason());
+    }
+
+    static DiscountResponse toResponse(DiscountView view) {
+        return new DiscountResponse(view.id(), view.code(), view.name(), view.kind(), view.benefitType(), view.percent(),
+                ScholarshipMoney.of(view.fixedAmount()), view.validFrom(), view.validTo(), view.stackable(),
+                view.concepts().stream().map(concept -> new ConceptResponse(concept.id(), concept.code(), concept.name())).toList(),
+                view.active(), view.version(), view.inUse(), view.createdAt(), view.updatedAt());
+    }
+
+    static DiscountPageResponse toDiscountResponse(Page<DiscountView> page) {
+        return new DiscountPageResponse(page.items().stream().map(ScholarshipMapper::toResponse).toList(), page.total(),
+                page.page(), page.size());
+    }
+
+    static AssignmentResponse toAssignmentResponse(AssignmentView view) {
+        return new AssignmentResponse(view.id(), view.discountId(), view.discountCode(), view.discountName(), view.studentId(),
+                view.studentCode(), view.validFrom(), view.validTo(), view.status(), view.requestedBy(), view.requestedAt(),
+                assignmentDecision(view.decision()), assignmentDecision(view.revocation()));
+    }
+
+    static AssignmentPageResponse toAssignmentResponse(Page<AssignmentView> page) {
+        return new AssignmentPageResponse(page.items().stream().map(ScholarshipMapper::toAssignmentResponse).toList(),
+                page.total(), page.page(), page.size());
+    }
+
+    private static AssignmentDecisionResponse assignmentDecision(AssignmentView.DecisionView decision) {
+        return decision == null ? null : new AssignmentDecisionResponse(decision.id(), decision.kind(), decision.decidedBy(),
                 decision.decidedAt(), decision.reason());
     }
 }

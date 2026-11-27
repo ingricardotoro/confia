@@ -237,7 +237,7 @@ public class ScholarshipController {
         return ScholarshipMapper.toResponse(scholarships.reactivate(RequestContext.actor(), RequestContext.requestId(), id));
     }
 
-    private static String amountOf(ScholarshipMoney money) {
+    static String amountOf(ScholarshipMoney money) {
         return money == null ? null : money.amount();
     }
 
