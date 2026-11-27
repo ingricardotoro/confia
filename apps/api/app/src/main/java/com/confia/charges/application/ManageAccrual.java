@@ -13,6 +13,7 @@ import com.confia.catalog.application.directory.PricingDirectory;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
 import com.confia.students.application.directory.EnrollmentRoster;
 import com.confia.students.application.directory.StudentDirectory;
 import com.confia.kernel.InstitutionId;
@@ -77,14 +78,24 @@ public final class ManageAccrual {
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
             AwardBenefits awards, AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter, Clock clock) {
+        this(transactionRunner, plans, items, runs, runItems, charges, placements, roster, students, pricing,
+                postingAccounts, ledgerAccounts, awards, DiscountBenefits.NONE, scheduler, auditLogWriter, clock);
+    }
+
+    public ManageAccrual(TransactionRunner transactionRunner, ChargePlanRepository plans,
+            ChargePlanItemRepository items, AccrualRunRepository runs, AccrualRunItemRepository runItems,
+            ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
+            PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
+            AwardBenefits awards, DiscountBenefits discounts, AccrualRunScheduler scheduler, AuditLogWriter auditLogWriter,
+            Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.plans = Objects.requireNonNull(plans, "plans");
         this.items = Objects.requireNonNull(items, "items");
         this.runs = Objects.requireNonNull(runs, "runs");
         this.runItems = Objects.requireNonNull(runItems, "runItems");
         this.calculator = new AccrualPreviewCalculator(
-                new AccrualEngine(placements, roster, students, pricing, charges, awards), pricing, postingAccounts,
-                ledgerAccounts, awards);
+                new AccrualEngine(placements, roster, students, pricing, charges, awards, discounts), pricing,
+                postingAccounts, ledgerAccounts, awards, discounts);
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
