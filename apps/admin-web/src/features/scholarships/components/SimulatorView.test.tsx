@@ -49,8 +49,8 @@ describe("SimulatorView", () => {
 
     const row = within(screen.getByRole("row", { name: /MENS · Mensualidad/ }));
     expect(row.getByText("L 1,100.00")).toBeInTheDocument();
-    expect(row.getByText("BECA25")).toBeInTheDocument();
-    expect(row.getByText("L 275.00")).toBeInTheDocument();
+    expect(row.getByText("Beca BECA25")).toBeInTheDocument();
+    expect(row.getAllByText("L 275.00")).toHaveLength(2);
     expect(row.getByText("L 825.00")).toBeInTheDocument();
     expect(row.getByText("L 123.75")).toBeInTheDocument();
     expect(row.getByText("L 948.75")).toBeInTheDocument();
@@ -108,8 +108,8 @@ describe("SimulatorView", () => {
           result: ready(
             chargeSimulation({
               lines: [
-                { paymentConceptId: "00000000-0000-4000-8000-000000007001", outcome: "CREATED", base: { amount: "1000.00", currency: "HNL" }, tax: { amount: "150.00", currency: "HNL" }, total: { amount: "1150.00", currency: "HNL" } },
-                { paymentConceptId: "00000000-0000-4000-8000-000000007002", outcome: "ERROR", errorCode: "NO_PRICE" },
+                { paymentConceptId: "00000000-0000-4000-8000-000000007001", outcome: "CREATED", base: { amount: "1000.00", currency: "HNL" }, benefits: [], tax: { amount: "150.00", currency: "HNL" }, total: { amount: "1150.00", currency: "HNL" } },
+                { paymentConceptId: "00000000-0000-4000-8000-000000007002", outcome: "ERROR", errorCode: "NO_PRICE", benefits: [] },
               ],
             }),
           ),
@@ -117,7 +117,7 @@ describe("SimulatorView", () => {
       />,
     );
 
-    expect(within(screen.getByRole("row", { name: /MENS · Mensualidad/ })).getByText("Sin beca")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /MENS · Mensualidad/ })).getByText("Sin beneficios")).toBeInTheDocument();
     const failing = within(screen.getByRole("row", { name: /Con error: NO_PRICE/ }));
     expect(failing.getAllByText("—").length).toBe(5);
   });

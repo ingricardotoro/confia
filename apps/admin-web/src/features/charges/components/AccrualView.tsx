@@ -3,6 +3,7 @@ import { useState, type SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import type { AccrualPreview } from "../charges-types.ts";
 import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { BenefitList } from "../../../shared/benefits/components/BenefitList.tsx";
 import { LEDGER_PATHS } from "../../../shared/navigation/ledger-paths.ts";
 import { ALL_ROWS, blockerKeyOf, ERROR_ROWS, filterPreviewRows, itemErrorHelpKeyOf, itemErrorKeyOf, pageOfRows, PREVIEW_PAGE_SIZE } from "../accrual-model.ts";
 import { AccrualOutcomeBadge } from "./AccrualOutcomeBadge.tsx";
@@ -99,11 +100,7 @@ function PreviewItems({ preview, names, onRecalculate }: { readonly preview: Acc
     { id: "student", header: t("charges.accrual.items.student"), cell: (item) => names.student(item.studentId) },
     { id: "concept", header: t("charges.accrual.items.concept"), cell: (item) => names.concept(item.paymentConceptId) },
     { id: "base", header: t("charges.accrual.items.base"), align: "end", cell: (item) => (item.base === undefined ? noAmount : <MoneyAmount value={item.base} size="sm" />) },
-    {
-      id: "scholarship",
-      header: t("charges.accrual.items.scholarship"),
-      cell: (item) => (item.scholarshipCode == null ? t("charges.accrual.items.noScholarship") : item.scholarshipCode),
-    },
+    { id: "benefits", header: t("charges.accrual.items.benefits"), cell: (item) => <BenefitList benefits={item.benefits} /> },
     {
       id: "benefit",
       header: t("charges.accrual.items.benefit"),

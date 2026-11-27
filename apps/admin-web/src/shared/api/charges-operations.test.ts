@@ -223,7 +223,7 @@ describe("the accrual operations", () => {
   });
 
   it("accepts the nulls of an item in error (no amounts) in the preview", async () => {
-    const body = { ...accrualPreview(), items: [{ studentId: ID, paymentConceptId: ITEM, outcome: "ERROR", errorCode: "NO_PRICE", base: null, tax: null, total: null, existingChargeId: null }] };
+    const body = { ...accrualPreview(), items: [{ studentId: ID, paymentConceptId: ITEM, outcome: "ERROR", errorCode: "NO_PRICE", benefits: [], base: null, tax: null, total: null, existingChargeId: null }] };
     route("post", `${PLAN}/accrual-preview`, { status: 200, contentType: "application/json", body });
 
     const result = await previewAccrual("tok", ID, { periodStart: "2027-02-01" });

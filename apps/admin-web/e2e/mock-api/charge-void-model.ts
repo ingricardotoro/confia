@@ -182,6 +182,7 @@ export function createChargeVoidModel(options: ChargeVoidOptions, dependencies: 
       dueOn: charge.dueOn,
       base: amountOf(charge.baseCents),
       benefitAmount: amountOf(0),
+      benefits: [],
       netBase: amountOf(charge.baseCents),
       tax: amountOf(charge.taxCents),
       total: amountOf(totalCents),

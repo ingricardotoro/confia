@@ -24,7 +24,7 @@ function ready(override: Partial<Extract<AccrualResultState, { kind: "ready" }>[
       items: [
         accrualPreviewItem({ studentId: STUDENT_A }),
         accrualPreviewItem({ studentId: STUDENT_B }),
-        { studentId: STUDENT_C, paymentConceptId: "00000000-0000-4000-8000-000000007001", outcome: "ERROR", errorCode: "NO_PRICE" },
+        { studentId: STUDENT_C, paymentConceptId: "00000000-0000-4000-8000-000000007001", outcome: "ERROR", errorCode: "NO_PRICE", benefits: [] },
       ],
       ...override,
     }),
@@ -66,6 +66,7 @@ describe("AccrualView", () => {
                 scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001",
                 scholarshipCode: "BECA25",
                 benefitAmount: money("275.00"),
+                benefits: [{ source: "SCHOLARSHIP", code: "BECA25", scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001", amount: money("275.00") }],
                 netBase: money("825.00"),
                 tax: money("123.75"),
                 total: money("948.75"),
@@ -83,11 +84,47 @@ describe("AccrualView", () => {
     expect(totals.getByText("2,325.00 lempiras hondureños")).toBeInTheDocument();
     const rows = screen.getByRole("table", { name: "Renglones de la vista previa: un estudiante y un concepto por renglón" });
     const withScholarship = within(within(rows).getByRole("row", { name: /Aguilar, Ana/ }));
-    expect(withScholarship.getByText("BECA25")).toBeInTheDocument();
+    expect(withScholarship.getByText("Beca BECA25")).toBeInTheDocument();
     expect(withScholarship.getByText("L 1,100.00")).toBeInTheDocument();
-    expect(withScholarship.getByText("L 275.00")).toBeInTheDocument();
+    // The line of the scholarship and the benefit of the row are the same figure, each as the server sent it.
+    expect(withScholarship.getAllByText("L 275.00")).toHaveLength(2);
     expect(withScholarship.getByText("L 825.00")).toBeInTheDocument();
-    expect(within(within(rows).getByRole("row", { name: /Aguilar, Luis/ })).getByText("Sin beca")).toBeInTheDocument();
+    expect(within(within(rows).getByRole("row", { name: /Aguilar, Luis/ })).getByText("Sin beneficios")).toBeInTheDocument();
+  });
+
+  it("lists every benefit of a row in the order the server applied it, the scholarship and then the discount, with the figures as they arrived", () => {
+    const money = (amount: string) => ({ amount, currency: "HNL" });
+    renderWithAdminI18n(
+      <AccrualView
+        {...props({
+          result: ready({
+            items: [
+              accrualPreviewItem({
+                studentId: STUDENT_A,
+                base: money("1000.00"),
+                benefitAmount: money("280.00"),
+                benefits: [
+                  { source: "SCHOLARSHIP", code: "BECA20", scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001", amount: money("200.00") },
+                  { source: "DISCOUNT", code: "CAMP10", discountId: "00000000-0000-4000-8000-0000000e0001", amount: money("80.00") },
+                ],
+                netBase: money("720.00"),
+                tax: money("108.00"),
+                total: money("828.00"),
+              }),
+            ],
+          }),
+        })}
+      />,
+    );
+
+    const rows = screen.getByRole("table", { name: "Renglones de la vista previa: un estudiante y un concepto por renglón" });
+    const row = within(within(rows).getByRole("row", { name: /Aguilar, Ana/ }));
+    const lines = row.getAllByRole("listitem");
+    expect(lines.map((line) => line.textContent)).toEqual([expect.stringMatching(/^Beca BECA20.*200\.00/), expect.stringMatching(/^Descuento CAMP10.*80\.00/)]);
+    expect(row.getByText("L 280.00")).toBeInTheDocument();
+    expect(row.getByText("L 720.00")).toBeInTheDocument();
+    expect(row.getByText("L 108.00")).toBeInTheDocument();
+    expect(row.getByText("L 828.00")).toBeInTheDocument();
   });
 
   it("shows the summary of the preview with the figures and the totals exactly as the server sent them", () => {
