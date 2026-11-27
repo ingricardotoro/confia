@@ -444,6 +444,40 @@
         "required" : [ "allocatedAt", "amount", "chargeId" ],
         "type" : "object"
       },
+      "AppliedBenefit" : {
+        "description" : "A benefit that reduced a charge, in the order it was applied",
+        "properties" : {
+          "amount" : {
+            "$ref" : "#/components/schemas/AccrualMoney",
+            "description" : "What the benefit took off the charge"
+          },
+          "code" : {
+            "description" : "The code of the scholarship or of the discount, as it was when the charge was issued",
+            "type" : "string"
+          },
+          "discountAssignmentId" : {
+            "description" : "The approved assignment that applied an agreement discount; absent for a campaign discount",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "discountId" : {
+            "description" : "The discount; present only for a discount",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "scholarshipAwardId" : {
+            "description" : "The award of the scholarship; present only for a scholarship",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "source" : {
+            "enum" : [ "SCHOLARSHIP", "DISCOUNT" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "amount", "code", "source" ],
+        "type" : "object"
+      },
       "ApproveCloseRequest" : {
         "properties" : {
           "note" : {
@@ -2285,8 +2319,15 @@
           },
           "benefitAmount" : {
             "$ref" : "#/components/schemas/AccrualMoney",
-            "description" : "What the scholarship takes off the base; zero when none applies",
+            "description" : "What the benefits (scholarship and discounts) take off the base; zero when none applies",
             "type" : "null"
+          },
+          "benefits" : {
+            "description" : "Every benefit that reduces the charge, scholarship and discounts, in the order they apply; empty when none",
+            "items" : {
+              "$ref" : "#/components/schemas/AppliedBenefit"
+            },
+            "type" : "array"
           },
           "errorCode" : {
             "type" : [ "string", "null" ]
@@ -2330,7 +2371,7 @@
             "type" : "null"
           }
         },
-        "required" : [ "outcome", "paymentConceptId", "studentId" ],
+        "required" : [ "benefits", "outcome", "paymentConceptId", "studentId" ],
         "type" : "object"
       },
       "KindCountResponse" : {
@@ -2423,8 +2464,15 @@
           },
           "benefitAmount" : {
             "$ref" : "#/components/schemas/AccrualMoney",
-            "description" : "What the scholarship takes off the base; zero when none applies",
+            "description" : "What the benefits (scholarship and discounts) take off the base; zero when none applies",
             "type" : "null"
+          },
+          "benefits" : {
+            "description" : "Every benefit that reduces the charge, scholarship and discounts, in the order they apply; empty when none",
+            "items" : {
+              "$ref" : "#/components/schemas/AppliedBenefit"
+            },
+            "type" : "array"
           },
           "errorCode" : {
             "type" : [ "string", "null" ]
@@ -2464,7 +2512,7 @@
             "type" : "null"
           }
         },
-        "required" : [ "outcome", "paymentConceptId" ],
+        "required" : [ "benefits", "outcome", "paymentConceptId" ],
         "type" : "object"
       },
       "LinkedStudentResponse" : {
@@ -4065,7 +4113,14 @@
           },
           "benefitAmount" : {
             "$ref" : "#/components/schemas/AccrualMoney",
-            "description" : "What the scholarship took off the base; zero when none applied"
+            "description" : "What the benefits (scholarship and discounts) took off the base; zero when none applied"
+          },
+          "benefits" : {
+            "description" : "Every benefit that reduced the charge, scholarship and discounts, in the order they applied; empty when none",
+            "items" : {
+              "$ref" : "#/components/schemas/AppliedBenefit"
+            },
+            "type" : "array"
           },
           "conceptCategory" : {
             "type" : "string"
@@ -4144,7 +4199,7 @@
             "description" : "Present only when the charge is voided"
           }
         },
-        "required" : [ "base", "benefitAmount", "conceptCategory", "dueOn", "id", "netBase", "origin", "outstanding", "paid", "paymentConceptId", "periodEnd", "periodLabel", "periodStart", "settled", "status", "tax", "total" ],
+        "required" : [ "base", "benefitAmount", "benefits", "conceptCategory", "dueOn", "id", "netBase", "origin", "outstanding", "paid", "paymentConceptId", "periodEnd", "periodLabel", "periodStart", "settled", "status", "tax", "total" ],
         "type" : "object"
       },
       "StudentEnrollmentResponse" : {

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -24,7 +25,7 @@ public record StudentChargeResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"AUTOMATIC", "MANUAL"}) String origin,
         @Schema(requiredMode = RequiredMode.REQUIRED) AccrualMoney base,
         @Schema(requiredMode = RequiredMode.REQUIRED,
-                description = "What the scholarship took off the base; zero when none applied") AccrualMoney benefitAmount,
+                description = "What the benefits (scholarship and discounts) took off the base; zero when none applied") AccrualMoney benefitAmount,
         @Schema(requiredMode = RequiredMode.REQUIRED,
                 description = "The base minus the benefit: what the tax was computed on") AccrualMoney netBase,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
@@ -44,7 +45,10 @@ public record StudentChargeResponse(
         boolean settled,
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"ACTIVE", "VOIDED"}) String status,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, description = "Present only when the charge is voided")
-        @JsonInclude(JsonInclude.Include.NON_NULL) VoidInfo voided) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) VoidInfo voided,
+        @Schema(requiredMode = RequiredMode.REQUIRED,
+                description = "Every benefit that reduced the charge, scholarship and discounts, in the order they applied; empty when none")
+        List<AppliedBenefitResponse> benefits) {
 
     /** What a void left on the charge. The reason may name a person: it never reaches a log through this record. */
     public record VoidInfo(

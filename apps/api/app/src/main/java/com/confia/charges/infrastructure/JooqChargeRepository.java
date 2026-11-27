@@ -4,6 +4,7 @@ import static confia.generated.jooq.tables.ChargesCharge.CHARGES_CHARGE;
 import static confia.generated.jooq.tables.ChargesChargeBenefit.CHARGES_CHARGE_BENEFIT;
 import static confia.generated.jooq.tables.ChargesChargeVoid.CHARGES_CHARGE_VOID;
 
+import com.confia.charges.application.AppliedBenefitView;
 import com.confia.charges.application.ChargeFilter;
 import com.confia.charges.application.ChargeRepository;
 import com.confia.charges.application.ChargeRow;
@@ -157,8 +158,8 @@ public final class JooqChargeRepository implements ChargeRepository {
      * The benefits of these charges, by charge, in the order they were applied. A charge from before the lines existed has none: its
      * scholarship, which was its only benefit, is built from the columns of the charge.
      */
-    private java.util.Map<UUID, List<AppliedBenefit>> benefitsOf(InstitutionId institution, List<ChargeRow> rows) {
-        java.util.Map<UUID, List<AppliedBenefit>> byCharge = new java.util.HashMap<>();
+    private java.util.Map<UUID, List<AppliedBenefitView>> benefitsOf(InstitutionId institution, List<ChargeRow> rows) {
+        java.util.Map<UUID, List<AppliedBenefitView>> byCharge = new java.util.HashMap<>();
         if (rows.isEmpty()) {
             return byCharge;
         }
@@ -167,13 +168,13 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .and(CHARGES_CHARGE_BENEFIT.CHARGE_ID.in(rows.stream().map(ChargeRow::id).toList()))
                 .orderBy(CHARGES_CHARGE_BENEFIT.CHARGE_ID, CHARGES_CHARGE_BENEFIT.POSITION)
                 .forEach(line -> byCharge.computeIfAbsent(line.getChargeId(), id -> new ArrayList<>())
-                        .add(new AppliedBenefit(AppliedBenefit.Source.valueOf(line.getSource()), line.getScholarshipAwardId(),
+                        .add(new AppliedBenefitView(line.getSource(), line.getScholarshipAwardId(),
                                 line.getScholarshipCode(), line.getDiscountId(), line.getDiscountCode(),
                                 line.getDiscountAssignmentId(),
                                 MoneyColumns.toMoney(line.getAmount(), line.getCurrency()))));
         for (ChargeRow row : rows) {
             if (!byCharge.containsKey(row.id()) && row.scholarshipAwardId() != null) {
-                byCharge.put(row.id(), List.of(new AppliedBenefit(AppliedBenefit.Source.SCHOLARSHIP, row.scholarshipAwardId(),
+                byCharge.put(row.id(), List.of(new AppliedBenefitView("SCHOLARSHIP", row.scholarshipAwardId(),
                         row.scholarshipCode(), null, null, null, row.benefit())));
             }
         }
@@ -281,7 +282,7 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .orderBy(orders(page))
                 .limit(page.size()).offset(page.offset())
                 .fetch(JooqChargeRepository::toRow);
-        java.util.Map<UUID, List<AppliedBenefit>> benefits = benefitsOf(institution, rows);
+        java.util.Map<UUID, List<AppliedBenefitView>> benefits = benefitsOf(institution, rows);
         rows = rows.stream().map(row -> row.withBenefits(benefits.getOrDefault(row.id(), List.of()))).toList();
         return new Page<>(rows, total, page.page(), page.size());
     }

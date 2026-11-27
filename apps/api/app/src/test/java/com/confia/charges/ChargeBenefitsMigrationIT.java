@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.confia.charges.application.ChargeFilter;
 import com.confia.charges.application.PageRequest;
-import com.confia.charges.domain.AppliedBenefit;
+import com.confia.charges.application.AppliedBenefitView;
 import com.confia.charges.infrastructure.JooqChargeRepository;
 import com.confia.kernel.InstitutionId;
 import com.confia.support.SharedPostgresContainer;
@@ -182,7 +182,7 @@ class ChargeBenefitsMigrationIT {
                 var first = page.items().get(0);
                 assertThat(first.id()).isEqualTo(withAward);
                 assertThat(first.benefits()).singleElement().satisfies(benefit -> {
-                    assertThat(benefit.source()).isEqualTo(AppliedBenefit.Source.SCHOLARSHIP);
+                    assertThat(benefit.source()).isEqualTo("SCHOLARSHIP");
                     assertThat(benefit.awardId()).isEqualTo(AWARD);
                     assertThat(benefit.scholarshipCode()).isEqualTo("BECA-25");
                     assertThat(benefit.amount().amount()).isEqualByComparingTo("275.00");

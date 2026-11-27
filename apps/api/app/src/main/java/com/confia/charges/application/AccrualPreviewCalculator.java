@@ -191,7 +191,7 @@ final class AccrualPreviewCalculator {
             Money total = null;
             UUID awardId = null;
             String scholarshipCode = null;
-            List<AppliedBenefit> applied = List.of();
+            List<AppliedBenefitView> applied = List.of();
             switch (line.outcome()) {
                 case CREATED -> {
                     created++;
@@ -200,7 +200,7 @@ final class AccrualPreviewCalculator {
                     netBase = line.charge().netBase();
                     tax = line.charge().amounts().tax();
                     total = line.charge().amounts().total();
-                    applied = line.charge().benefits();
+                    applied = AppliedBenefitView.of(line.charge().benefits());
                     if (line.charge().benefit() != null) {
                         awardId = line.charge().benefit().awardId();
                         scholarshipCode = line.charge().benefit().scholarshipCode();

@@ -88,6 +88,6 @@ public class ChargeSimulationController {
         return new ChargeSimulationResponse.Line(line.paymentConceptId(), line.outcome().name(), line.error(),
                 AccrualMoney.of(line.base()), AccrualMoney.of(line.benefit()), AccrualMoney.of(line.netBase()),
                 line.scholarshipAwardId(), line.scholarshipCode(), AccrualMoney.of(line.tax()),
-                AccrualMoney.of(line.total()), line.existingChargeId());
+                AccrualMoney.of(line.total()), line.existingChargeId(), AppliedBenefitResponse.of(line.benefits()));
     }
 }
