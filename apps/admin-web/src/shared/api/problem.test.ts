@@ -93,6 +93,11 @@ describe("the known codes", () => {
         "scholarship-award-overlap",
         "invalid-award-state",
         "scholarship-scope-locked",
+        "duplicate-discount-code",
+        "discount-benefit-locked",
+        "discount-scope-locked",
+        "discount-assignment-overlap",
+        "invalid-discount-assignment-state",
       ].sort(),
     );
   });

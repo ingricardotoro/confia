@@ -165,6 +165,11 @@ const SCHOLARSHIPS = "/scholarships/list";
 const AWARDS = "/scholarships/awards";
 const AWARD_PENDING = `${AWARDS}/00000000-0000-4000-8000-0000000f0001`;
 const SIMULATOR = "/scholarships/simulator";
+/** The discounts (scholarships-discounts cut): the list of discounts. */
+const DISCOUNTS = "/scholarships/discounts";
+/** The agreement assignments (scholarships-discounts cut): the list, and the seeded pending one another person requested. */
+const ASSIGNMENTS = "/scholarships/discount-assignments";
+const ASSIGNMENT_PENDING = `${ASSIGNMENTS}/00000000-0000-4000-8000-0000000c0001`;
 
 /** A route of the scholarships with the cookies of a signed in session: the same way in as the catalog's. */
 const openScholarshipsRoute = (page: Page, path: string): Promise<void> => openCatalogRoute(page, path);
@@ -1873,5 +1878,86 @@ export const MATRIX: readonly GateCombination[] = [
       await page.getByRole("button", { name: "Simular" }).click();
     },
     expected: (page) => page.getByRole("table", { name: "Resultado de la simulación por concepto" }),
+  },
+  // The discounts (scholarships-discounts cut): the list with rows, empty and with a read that fails, the form to create one, and the form of one in use.
+  {
+    route: DISCOUNTS,
+    state: "ready",
+    arrange: (page) => openScholarshipsRoute(page, DISCOUNTS),
+    expected: (page) => page.getByRole("table", { name: "Descuentos de la institución" }).getByRole("row").nth(1),
+  },
+  {
+    route: DISCOUNTS,
+    state: "empty",
+    preset: "discounts-empty",
+    arrange: (page) => openScholarshipsRoute(page, DISCOUNTS),
+    expected: (page) => page.getByText("Todavía no hay descuentos"),
+  },
+  {
+    route: DISCOUNTS,
+    state: "load-error",
+    preset: "discounts-server-error",
+    arrange: (page) => openScholarshipsRoute(page, DISCOUNTS),
+    expected: (page) => page.getByText("No se pudieron cargar los descuentos"),
+  },
+  {
+    route: DISCOUNTS,
+    state: "create-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, DISCOUNTS);
+      await page.getByRole("button", { name: "Crear descuento" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Crear un descuento" }),
+  },
+  {
+    route: DISCOUNTS,
+    state: "edit-in-use-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, DISCOUNTS);
+      await page.getByRole("button", { name: "Editar Convenio con la empresa" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Editar el descuento" }),
+  },
+  // The agreement assignments (scholarships-discounts cut): the list with rows and empty, the request, the detail of a pending one with its reject dialog.
+  {
+    route: ASSIGNMENTS,
+    state: "ready",
+    arrange: (page) => openScholarshipsRoute(page, ASSIGNMENTS),
+    expected: (page) => page.getByRole("table", { name: "Asignaciones de descuentos de convenio" }).getByRole("row").nth(1),
+  },
+  {
+    route: ASSIGNMENTS,
+    state: "empty",
+    preset: "discounts-empty",
+    arrange: (page) => openScholarshipsRoute(page, ASSIGNMENTS),
+    expected: (page) => page.getByText("Todavía no hay asignaciones"),
+  },
+  {
+    route: ASSIGNMENTS,
+    state: "request-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, ASSIGNMENTS);
+      await page.getByRole("button", { name: "Solicitar asignación" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Solicitar una asignación" }),
+  },
+  {
+    route: ASSIGNMENT_PENDING,
+    state: "pending",
+    arrange: (page) => openScholarshipsRoute(page, ASSIGNMENT_PENDING),
+    expected: (page) => page.getByRole("button", { name: "Aprobar" }),
+  },
+  {
+    route: ASSIGNMENT_PENDING,
+    state: "reject-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, ASSIGNMENT_PENDING);
+      await page.getByRole("button", { name: "Rechazar" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Rechazar la asignación" }),
   },
 ];

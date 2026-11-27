@@ -68,6 +68,11 @@ export const KNOWN_PROBLEM_CODES = [
   "scholarship-award-overlap",
   "invalid-award-state",
   "scholarship-scope-locked",
+  "duplicate-discount-code",
+  "discount-benefit-locked",
+  "discount-scope-locked",
+  "discount-assignment-overlap",
+  "invalid-discount-assignment-state",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

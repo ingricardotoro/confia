@@ -37,3 +37,22 @@ export function awardFailureOf(error: unknown): { readonly failure: AccessFailur
   const outcomeUnknown = result.kind === "network" || result.kind === "unexpected-response" || result.problem.status >= 500;
   return { failure: classifyAwardFailure(result), outcomeUnknown };
 }
+
+/**
+ * Sorts a failed write of the agreement assignments the way the awards are sorted: the person who requested an assignment cannot decide it
+ * (`self-approval-forbidden`), with the text of the assignments, and every other code goes through the classifier of the awards (the reason of a
+ * decision worded as a bounded text, and the business codes of the shared classifier).
+ */
+export function classifyAssignmentFailure(result: ApiFailureResult): AccessFailure {
+  if (result.kind === "problem" && result.problem.code === "self-approval-forbidden") {
+    const { traceId } = result.problem;
+    return { kind: "message", key: "scholarships.errors.assignmentSelfApproval", ...(traceId === undefined ? {} : { traceId }) };
+  }
+  return classifyAwardFailure(result);
+}
+
+/** What a rejected write of an assignment holds, as the failure a form shows and whether the server may have done the write (so the same intent is sent again). */
+export function assignmentFailureOf(error: unknown): { readonly failure: AccessFailure; readonly outcomeUnknown: boolean } {
+  const { failure, outcomeUnknown } = awardFailureOf(error);
+  return error instanceof ApiFailure ? { failure: classifyAssignmentFailure(error.result), outcomeUnknown } : { failure, outcomeUnknown };
+}

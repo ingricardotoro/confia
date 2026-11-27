@@ -26,3 +26,19 @@ export const simulationKeys = {
   plans: (params: object) => [...simulationKeys.all, "plans", params] as const,
   periods: (planId: string) => [...simulationKeys.all, "periods", planId] as const,
 };
+
+/** Query keys of the discounts: everything about discounts, every list, one list. */
+export const discountKeys = {
+  all: ["scholarships", "discount"] as const,
+  lists: () => [...discountKeys.all, "list"] as const,
+  list: (params: object) => [...discountKeys.lists(), params] as const,
+};
+
+/** Query keys of the agreement assignments: everything about them, every list, one list, every detail, one detail. */
+export const assignmentKeys = {
+  all: ["scholarships", "discount-assignment"] as const,
+  lists: () => [...assignmentKeys.all, "list"] as const,
+  list: (params: object) => [...assignmentKeys.lists(), params] as const,
+  details: () => [...assignmentKeys.all, "detail"] as const,
+  detail: (id: string) => [...assignmentKeys.details(), id] as const,
+};

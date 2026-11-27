@@ -18,6 +18,7 @@ import {
 } from "./scenarios.ts";
 import { CASHBOX_BASE } from "./cashbox-model.ts";
 import { PAYMENTS_BASE } from "./payments-model.ts";
+import { ASSIGNMENTS_BASE, DISCOUNTS_BASE } from "./discounts-model.ts";
 import { AWARDS_BASE, SCHOLARSHIPS_BASE } from "./scholarships-model.ts";
 import { CATALOG_BASE } from "./catalog-model.ts";
 import { CHARGES_BASE } from "./charges-model.ts";
@@ -266,6 +267,21 @@ export function createMockServer(options: MockServerOptions = {}): MockServer {
         headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
       });
       if (answer !== undefined) { deliver(res, scenario, "payments", answer); return; }
+    }
+    // The discounts and their agreement assignments (below the base of the scholarships, so they are answered first).
+    if (path === DISCOUNTS_BASE || path.startsWith(`${DISCOUNTS_BASE}/`) || path === ASSIGNMENTS_BASE || path.startsWith(`${ASSIGNMENTS_BASE}/`)) {
+      const session = scenario.model.currentSession(bearerOf(req));
+      if (session.status !== 200) { deliver(res, scenario, "scholarships", session); return; }
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body = method === "POST" || method === "PUT" ? await readBody(req) : undefined;
+      const answer = scenario.discounts.handle({
+        method,
+        path,
+        query: url.searchParams,
+        body,
+        headers: { "idempotency-key": typeof req.headers["idempotency-key"] === "string" ? req.headers["idempotency-key"] : undefined },
+      });
+      if (answer !== undefined) { deliver(res, scenario, "scholarships", answer); return; }
     }
     // The scholarships and their awards: the definition, the request, the decision of an award.
     if (path === SCHOLARSHIPS_BASE || path.startsWith(`${SCHOLARSHIPS_BASE}/`) || path === AWARDS_BASE || path.startsWith(`${AWARDS_BASE}/`)) {

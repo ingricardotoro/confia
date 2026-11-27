@@ -53,6 +53,10 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "scholarship-award-overlap",
   "invalid-award-state",
   "scholarship-scope-locked",
+  "discount-benefit-locked",
+  "discount-scope-locked",
+  "discount-assignment-overlap",
+  "invalid-discount-assignment-state",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */
@@ -112,6 +116,10 @@ export function classifyOrganizationFailure(result: ApiFailureResult): AccessFai
   // The same for the code of a scholarship.
   if (result.kind === "problem" && result.problem.code === "duplicate-scholarship-code") {
     return { kind: "fields", errors: [{ field: "code", reason: "duplicate-scholarship-code" }] };
+  }
+  // The same for the code of a discount.
+  if (result.kind === "problem" && result.problem.code === "duplicate-discount-code") {
+    return { kind: "fields", errors: [{ field: "code", reason: "duplicate-discount-code" }] };
   }
   // The same for the code of an account of the chart.
   if (result.kind === "problem" && result.problem.code === "duplicate-account-code") {
