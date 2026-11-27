@@ -10,6 +10,7 @@ import com.confia.charges.domain.ChargeEvaluator;
 import com.confia.charges.domain.ChargePlan;
 import com.confia.charges.domain.ComputedCharge;
 import com.confia.charges.domain.ConceptTerms;
+import com.confia.charges.domain.DiscountCandidate;
 import com.confia.charges.domain.PriceCandidate;
 import com.confia.charges.domain.PriceScope;
 import com.confia.charges.domain.StudentPlacement;
@@ -18,6 +19,7 @@ import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
 import com.confia.students.application.directory.EnrollmentRoster;
 import com.confia.students.application.directory.StudentDirectory;
 import com.confia.students.application.directory.StudentRef;
@@ -37,7 +39,7 @@ import java.util.UUID;
  * every amount comes from the pure rules of {@code charges.domain}. It opens no transaction, so the caller decides whether
  * the reads lock ({@code lockShare}) and in which transaction they run.
  *
- * <p>The benefit of a scholarship enters the pipeline of each charge as a step ({@link com.confia.charges.domain.BenefitsStep}):
+ * <p>The benefits enter the pipeline of each charge as steps ({@link com.confia.charges.domain.BenefitsStep} for the scholarship and {@link com.confia.charges.domain.DiscountsStep} for the discounts in force, which {@code scholarships} publishes as {@code DiscountBenefits}); the scholarship step:
  * {@code scholarships} says what each approved award in force at the first day of the period offers on the base the price
  * produced, and the pure rules of {@code charges.domain} choose the greatest and compute the tax on what is left. The preview, the
  * run of the worker and the simulator all come through here, so they cannot disagree.
@@ -67,15 +69,17 @@ final class AccrualEngine {
     private final PricingDirectory pricing;
     private final ChargeRepository charges;
     private final AwardBenefits awards;
+    private final DiscountBenefits discounts;
 
     AccrualEngine(PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
-            PricingDirectory pricing, ChargeRepository charges, AwardBenefits awards) {
+            PricingDirectory pricing, ChargeRepository charges, AwardBenefits awards, DiscountBenefits discounts) {
         this.placements = Objects.requireNonNull(placements, "placements");
         this.roster = Objects.requireNonNull(roster, "roster");
         this.students = Objects.requireNonNull(students, "students");
         this.pricing = Objects.requireNonNull(pricing, "pricing");
         this.charges = Objects.requireNonNull(charges, "charges");
         this.awards = Objects.requireNonNull(awards, "awards");
+        this.discounts = Objects.requireNonNull(discounts, "discounts");
     }
 
     /**
@@ -191,7 +195,11 @@ final class AccrualEngine {
         ChargeEvaluator evaluator = new ChargeEvaluator(base -> awards
                 .offers(institution, student.studentId(), conceptId, period.start(), base,
                         awardId -> alreadyGiven(institution, awardId, period.start(), given), lockShare).stream()
-                .map(offer -> new BenefitOffer(offer.awardId(), offer.scholarshipCode(), offer.amount())).toList());
+                .map(offer -> new BenefitOffer(offer.awardId(), offer.scholarshipCode(), offer.amount())).toList(),
+                base -> discounts.inForce(institution, student.studentId(), conceptId, period.start(), base.currency(),
+                        lockShare).stream()
+                        .map(found -> new DiscountCandidate(found.discountId(), found.discountCode(), found.assignmentId(),
+                                found.stackable(), found::on)).toList());
         return evaluator.evaluate(student, plan.id(), planPeriod, concept, prices, rate);
     }
 

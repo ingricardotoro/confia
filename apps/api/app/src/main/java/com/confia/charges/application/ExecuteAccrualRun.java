@@ -20,6 +20,7 @@ import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.ledger.application.api.LedgerPostingApi;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.SecurityContext;
 import com.confia.shared.security.TransactionRunner;
@@ -95,6 +96,16 @@ public final class ExecuteAccrualRun {
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
             AwardBenefits awards, LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
+        this(transactionRunner, plans, planItems, runs, runItems, charges, placements, roster, students, pricing,
+                postingAccounts, ledgerAccounts, awards, DiscountBenefits.NONE, ledger, auditLogWriter, clock);
+    }
+
+    public ExecuteAccrualRun(TransactionRunner transactionRunner, ChargePlanRepository plans,
+            ChargePlanItemRepository planItems, AccrualRunRepository runs, AccrualRunItemRepository runItems,
+            ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
+            PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
+            AwardBenefits awards, DiscountBenefits discounts, LedgerPostingApi ledger, AuditLogWriter auditLogWriter,
+            Clock clock) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.plans = Objects.requireNonNull(plans, "plans");
         this.planItems = Objects.requireNonNull(planItems, "planItems");
@@ -104,8 +115,8 @@ public final class ExecuteAccrualRun {
         this.postingAccounts = Objects.requireNonNull(postingAccounts, "postingAccounts");
         this.ledger = Objects.requireNonNull(ledger, "ledger");
         this.placements = Objects.requireNonNull(placements, "placements");
-        this.engine = new AccrualEngine(placements, roster, students, pricing, charges, awards);
-        this.calculator = new AccrualPreviewCalculator(engine, pricing, postingAccounts, ledgerAccounts, awards);
+        this.engine = new AccrualEngine(placements, roster, students, pricing, charges, awards, discounts);
+        this.calculator = new AccrualPreviewCalculator(engine, pricing, postingAccounts, ledgerAccounts, awards, discounts);
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
