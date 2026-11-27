@@ -48,7 +48,7 @@ function props(override: Partial<StudentChargesViewProps> = {}): StudentChargesV
 }
 
 describe("StudentChargesView", () => {
-  it("shows the scholarship applied to a charge with its code, the gross base, the benefit and the net base exactly as the server sent them, and Sin beca when none applied", () => {
+  it("shows the scholarship applied to a charge with its code, the gross base, the benefit and the net base exactly as the server sent them, and Sin beneficios when none applied", () => {
     const withScholarship = studentCharge({
       id: "00000000-0000-4000-8000-0000000d0003",
       periodLabel: "2027-03",
@@ -57,6 +57,7 @@ describe("StudentChargesView", () => {
       scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001",
       scholarshipCode: "BECA25",
       benefitAmount: { amount: "275.00", currency: "HNL" },
+      benefits: [{ source: "SCHOLARSHIP", code: "BECA25", scholarshipAwardId: "00000000-0000-4000-8000-0000000f0001", amount: { amount: "275.00", currency: "HNL" } }],
       netBase: { amount: "825.00", currency: "HNL" },
       tax: { amount: "123.75", currency: "HNL" },
       total: { amount: "948.75", currency: "HNL" },
@@ -64,12 +65,12 @@ describe("StudentChargesView", () => {
     renderWithAdminI18n(<StudentChargesView {...props({ rows: [withScholarship, ACTIVE] })} />);
 
     const scholarship = within(screen.getByRole("row", { name: /2027-03/ }));
-    expect(scholarship.getByText("BECA25")).toBeInTheDocument();
+    expect(scholarship.getByText("Beca BECA25")).toBeInTheDocument();
     expect(scholarship.getByText("L 1,100.00")).toBeInTheDocument();
-    expect(scholarship.getByText("L 275.00")).toBeInTheDocument();
+    expect(scholarship.getAllByText("L 275.00")).toHaveLength(2);
     expect(scholarship.getByText("L 825.00")).toBeInTheDocument();
     expect(scholarship.getByText("L 123.75")).toBeInTheDocument();
-    expect(within(screen.getByRole("row", { name: /2027-02/ })).getByText("Sin beca")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /2027-02/ })).getByText("Sin beneficios")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Base neta" })).toBeInTheDocument();
   });
   it("offers to void only the charge in force, by name, and sends the row up", async () => {

@@ -220,6 +220,7 @@ export function createAccrualSimulator(scenario: AccrualScenario, context: Accru
         paymentConceptId: row.paymentConceptId,
         outcome: row.outcome,
         errorCode: row.errorCode,
+        benefits: [],
         ...(row.base === undefined ? { base: null, benefitAmount: null, netBase: null, tax: null, total: null } : { base: money(row.base), benefitAmount: money(0), netBase: money(row.base), tax: money(row.tax ?? 0), total: money(row.base + (row.tax ?? 0)) }),
         existingChargeId: row.existingChargeId,
       })),
@@ -367,7 +368,7 @@ export function createAccrualSimulator(scenario: AccrualScenario, context: Accru
       const concept = concepts[index];
       if (concept === undefined) return [];
       const error = index === 0 ? ({ 2: "NO_PRICE", 5: "AMBIGUOUS_PRICE", 8: "TAX_RATE_MISSING" } as Record<number, string>)[studentIndex] : undefined;
-      if (error !== undefined) return [{ paymentConceptId: id, outcome: "ERROR", errorCode: error }];
+      if (error !== undefined) return [{ paymentConceptId: id, outcome: "ERROR", errorCode: error, benefits: [] }];
       const base = baseCentsOf(index);
       const offer = context.benefitFor?.(studentId, id, period);
       const benefit = offer === undefined ? 0 : Math.floor((base * offer.hundredths + 5_000) / 10_000);
@@ -381,6 +382,7 @@ export function createAccrualSimulator(scenario: AccrualScenario, context: Accru
           scholarshipAwardId: offer?.awardId ?? null,
           scholarshipCode: offer?.code ?? null,
           benefitAmount: money(benefit),
+          benefits: offer === undefined ? [] : [{ source: "SCHOLARSHIP", code: offer.code, scholarshipAwardId: offer.awardId, amount: money(benefit) }],
           netBase: money(net),
           tax: money(tax),
           total: money(net + tax),

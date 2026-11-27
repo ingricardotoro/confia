@@ -39,7 +39,7 @@ test.describe("the awards of scholarships", () => {
     await expect(page.getByRole("heading", { level: 2, name: "Simulador de cargos" })).toBeVisible();
     await simulateFirstStudent(page);
     const before = page.getByRole("table", { name: "Resultado de la simulación por concepto" });
-    await expect(before.getByText("Sin beca")).toBeVisible();
+    await expect(before.getByText("Sin beneficios")).toBeVisible();
     await expect(before.getByText("L 1,500.00").first()).toBeVisible();
     await expectNoBlockingViolations(page);
 
