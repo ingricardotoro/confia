@@ -1,9 +1,15 @@
 package com.confia.scholarships.web.wiring;
 
 import com.confia.scholarships.application.DecideAward;
+import com.confia.scholarships.application.DecideDiscountAssignment;
+import com.confia.scholarships.application.ManageDiscounts;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
+import com.confia.scholarships.application.RequestDiscountAssignment;
 import com.confia.scholarships.application.ViewAwards;
+import com.confia.scholarships.application.ViewDiscountAssignments;
+import com.confia.scholarships.web.DiscountAssignmentController;
+import com.confia.scholarships.web.DiscountController;
 import com.confia.scholarships.web.ScholarshipAwardController;
 import com.confia.scholarships.web.ScholarshipController;
 import org.springframework.context.annotation.Bean;
@@ -30,5 +36,16 @@ public class ScholarshipsWebConfiguration {
     ScholarshipAwardController scholarshipAwardController(RequestAward requestAward, DecideAward decideAward,
             ViewAwards viewAwards) {
         return new ScholarshipAwardController(requestAward, decideAward, viewAwards);
+    }
+
+    @Bean
+    DiscountController discountController(ManageDiscounts manageDiscounts) {
+        return new DiscountController(manageDiscounts);
+    }
+
+    @Bean
+    DiscountAssignmentController discountAssignmentController(RequestDiscountAssignment requestAssignment,
+            DecideDiscountAssignment decideAssignment, ViewDiscountAssignments viewAssignments) {
+        return new DiscountAssignmentController(requestAssignment, decideAssignment, viewAssignments);
     }
 }

@@ -248,6 +248,10 @@ class OpenApiContractSnapshotTest {
                 "/api/v1/scholarships/{id}/reactivate", "/api/v1/scholarship-awards", "/api/v1/scholarship-awards/{id}",
                 "/api/v1/scholarship-awards/{id}/approve", "/api/v1/scholarship-awards/{id}/reject",
                 "/api/v1/scholarship-awards/{id}/revoke",
+                "/api/v1/scholarships/discounts", "/api/v1/scholarships/discounts/{id}", "/api/v1/scholarships/discounts/{id}/deactivate",
+                "/api/v1/scholarships/discounts/{id}/reactivate", "/api/v1/scholarships/discount-assignments",
+                "/api/v1/scholarships/discount-assignments/{id}", "/api/v1/scholarships/discount-assignments/{id}/approve",
+                "/api/v1/scholarships/discount-assignments/{id}/reject", "/api/v1/scholarships/discount-assignments/{id}/revoke",
                 "/api/v1/ledger/accounts", "/api/v1/ledger/accounts/{id}",
                 "/api/v1/students", "/api/v1/students/{id}",
                 "/api/v1/enrollments", "/api/v1/enrollments/{id}", "/api/v1/enrollments/{id}/transfer",
@@ -436,7 +440,7 @@ class OpenApiContractSnapshotTest {
             }
         }
 
-        assertThat(operations).isEqualTo(112);
+        assertThat(operations).isEqualTo(124);
         List<String> expected = new ArrayList<>(List.of("get " + ROLES_PATH,
                 "get /api/v1/catalog/payment-concepts", "post /api/v1/catalog/payment-concepts",
                 "put /api/v1/catalog/payment-concepts/{id}", "get /api/v1/catalog/price-lists",
@@ -465,7 +469,13 @@ class OpenApiContractSnapshotTest {
                 "post /api/v1/scholarships/{id}/reactivate", "get /api/v1/scholarship-awards",
                 "post /api/v1/scholarship-awards", "get /api/v1/scholarship-awards/{id}",
                 "post /api/v1/scholarship-awards/{id}/approve", "post /api/v1/scholarship-awards/{id}/reject",
-                "post /api/v1/scholarship-awards/{id}/revoke", "get /api/v1/ledger/accounts", "post /api/v1/ledger/accounts",
+                "post /api/v1/scholarship-awards/{id}/revoke", "get /api/v1/scholarships/discounts", "post /api/v1/scholarships/discounts",
+                "get /api/v1/scholarships/discounts/{id}", "put /api/v1/scholarships/discounts/{id}",
+                "post /api/v1/scholarships/discounts/{id}/deactivate", "post /api/v1/scholarships/discounts/{id}/reactivate",
+                "get /api/v1/scholarships/discount-assignments", "post /api/v1/scholarships/discount-assignments",
+                "get /api/v1/scholarships/discount-assignments/{id}", "post /api/v1/scholarships/discount-assignments/{id}/approve",
+                "post /api/v1/scholarships/discount-assignments/{id}/reject", "post /api/v1/scholarships/discount-assignments/{id}/revoke",
+                "get /api/v1/ledger/accounts", "post /api/v1/ledger/accounts",
                 "put /api/v1/ledger/accounts/{id}"));
         for (String resource : List.of("academic-years", "modalities", "grades", "sections")) {
             String collection = "/api/v1/organization/" + resource;

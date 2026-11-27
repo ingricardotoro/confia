@@ -145,6 +145,30 @@ class PermissionedEndpointsTest {
                 Permission.SCHOLARSHIPS_APPROVE));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarship-awards/{id}/revoke",
                 Permission.SCHOLARSHIPS_VOID));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships/discounts",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discounts",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships/discounts/{id}",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.PUT, "/api/v1/scholarships/discounts/{id}",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discounts/{id}/deactivate",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discounts/{id}/reactivate",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships/discount-assignments",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discount-assignments",
+                Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships/discount-assignments/{id}",
+                Permission.SCHOLARSHIPS_READ));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discount-assignments/{id}/approve",
+                Permission.SCHOLARSHIPS_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discount-assignments/{id}/reject",
+                Permission.SCHOLARSHIPS_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discount-assignments/{id}/revoke",
+                Permission.SCHOLARSHIPS_VOID));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/ledger/accounts", Permission.LEDGER_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/ledger/accounts",
                 Permission.LEDGER_CREATE));
