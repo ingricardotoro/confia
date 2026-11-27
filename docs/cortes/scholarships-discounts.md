@@ -86,3 +86,52 @@ rechaza, y `scholarships:void` revoca.
 - Pronto pago (con pagos).
 - Descuentos por modalidad, grado o sección (este corte cubre la institución completa y los convenios por estudiante).
 - Aplicar descuentos a cargos ya emitidos; reportes de costo de descuentos.
+
+## Lo construido (backend T1, 2026-11-26)
+
+- **Esquema (`V39__create_scholarships_discounts.sql`).** Cuatro tablas con RLS forzada por institución: `scholarships_discount`,
+  `scholarships_discount_concept`, `scholarships_discount_assignment` y `scholarships_discount_assignment_decision` (solo inserción, con la
+  `Idempotency-Key` guardada de forma permanente y la huella de lo pedido). La base rechaza, también al dueño: beneficio que no sea un porcentaje
+  mayor que 0 y hasta 100, o un monto fijo mayor que 0, ambos con dos decimales y en HNL; vigencia invertida o fuera de 2000-2100; descuento sin
+  concepto; cambio de código, clase o creación; cualquier `DELETE`; asignación de un descuento de campaña, de uno inactivo o fuera de su vigencia;
+  dos asignaciones aprobadas del mismo descuento y estudiante que se solapen (restricción de exclusión sobre el rango cerrado de fechas);
+  decisión fuera del estado que decide, de otra cuenta, o de quien solicitó (autoaprobación); motivo fuera de 20 a 500 caracteres; estado sin su
+  decisión; y cualquier `UPDATE` o `DELETE` de una decisión.
+- **Descuento en uso.** Con una asignación aprobada (o revocada después) el tipo y el valor no cambian, la vigencia solo se acorta y los
+  conceptos solo se quitan; la base lo exige con `restrict_violation` y la API responde `409 discount-benefit-locked` o
+  `409 discount-scope-locked`. Gancho para T2: «en uso» hoy significa «tiene una asignación aprobada o revocada»; la tarea del devengo debe
+  agregar «o un cargo emitido con el descuento» con `CREATE OR REPLACE` de `scholarships_discount_guard` y de
+  `scholarships_discount_concept_before_insert`, y en `DiscountAssignmentRepository.inUse`.
+- **Módulo `scholarships`.** Dominio (`Discount`, `DiscountKind`, `DiscountAssignment`, `AssignmentDecision` y cinco errores), casos de uso
+  (`ManageDiscounts`, `RequestDiscountAssignment`, `DecideDiscountAssignment`, `ViewDiscountAssignments`), puertos y adaptadores jOOQ,
+  bitácora (`scholarships.discount.created|updated|deactivated|reactivated` y `scholarships.discount_assignment.requested|approved|rejected|revoked`,
+  con la huella SHA-256 y la longitud del motivo, nunca su texto) y los controladores `DiscountController` y `DiscountAssignmentController`. El
+  ciclo de la asignación reutiliza `AwardStatus` y `DecisionKind`, porque es el mismo ciclo que el del otorgamiento.
+- **Rutas** (según la nota, bajo `/api/v1/scholarships`): `GET|POST /discounts`, `GET|PUT /discounts/{id}`, `POST /discounts/{id}/deactivate|reactivate`,
+  `GET|POST /discount-assignments`, `GET /discount-assignments/{id}` y `POST /discount-assignments/{id}/approve|reject|revoke` (con
+  `Idempotency-Key`). Permisos: `scholarships:read` (listar y leer), `create` (definir descuentos y solicitar), `approve` (aprobar y rechazar) y
+  `void` (revocar). Doce operaciones nuevas en `admin.openapi.json` (124 en total); `packages/contracts` no se regeneró (corresponde a T3).
+- **Puerto de lectura para el devengo (T2).** `scholarships.application.api.DiscountBenefits.inForce(...)` devuelve los descuentos vigentes de un
+  estudiante para un concepto y una fecha (campaña: todos; convenio: solo con asignación aprobada y vigente; activos, con ambos extremos
+  incluidos, solo en HNL), ya en el orden de la cascada: porcentaje antes que monto fijo y, dentro de cada grupo, por código. Cada elemento trae
+  `stackable`, `percentage` y la función `on(base)` que da su beneficio sobre la base que se le pase (`HALF_UP`, nunca mayor que la base), de modo
+  que la cascada y la elección del mayor las decide el módulo `charges` sin tipos del dominio de becas. También `anyApplicable(...)` y la
+  identidad `NONE`. Registrado en el proceso administrativo y en el trabajador; `charges` no se tocó.
+- **Pruebas nuevas (128):** `DiscountTest` (41) y `DiscountAssignmentTest` (14) de dominio; `DiscountBenefitsServiceTest` (10);
+  `DiscountsIT` (39, base real: restricciones, RLS, llaves, carrera de dos decisiones, auditoría); `DiscountBenefitsIT` (9);
+  `DiscountsEndpointsIT` (15, proceso administrativo real: permisos por rol, autoaprobación 403, sesión revocada, validación, 404 entre
+  instituciones). Inventarios actualizados: `PermissionedEndpoints` y su prueba, `PublicRouteAllowListTest`, `CurrentSessionEndpointIT`,
+  `OpenApiContractSnapshotTest`, `ProblemCodeTest` (cinco códigos nuevos) e `IdempotencyScopeExclusionInventoryTest`.
+
+### Desviaciones y pendientes
+
+- **Regla añadida:** acortar la vigencia de un descuento que dejaría fuera una asignación pendiente o aprobada se rechaza (`400 validation-failed`,
+  campo `validTo`, motivo `assignments-outside-validity`); así la vigencia de la asignación siempre queda dentro de la del descuento. Aprobar
+  vuelve a comprobar esa inclusión. La nota no lo decía; para acortar, primero se revoca o rechaza la asignación.
+- Cambiar la marca `stackable` se permite aunque el descuento esté en uso (la nota solo bloquea tipo, valor y alcance); solo afecta a los cargos
+  que se emitan después.
+- Cinco códigos de problema nuevos: `duplicate-discount-code`, `discount-benefit-locked`, `discount-scope-locked`,
+  `discount-assignment-overlap` e `invalid-discount-assignment-state`. La autoaprobación reutiliza `self-approval-forbidden` (403).
+- Pendiente de T2: cascada, detalle por beneficio en el cargo, asiento, vista previa, cargos del estudiante y simulador; ampliar «en uso» con los
+  cargos emitidos. Pendiente de T3: `packages/contracts` y pantallas. `docs/03-seguridad.md` §5.3 no se actualizó con la segregación de las
+  asignaciones de convenio.
