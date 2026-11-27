@@ -470,10 +470,12 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     const fingerprint = JSON.stringify([kind, body ?? null]);
     const known = discount.keys.get(key);
     if (known !== undefined) return known === fingerprint ? wrap(discountRecord(discountBody(discount))) : failure("idempotency-payload-mismatch", 422);
-    const parsed = (kind === "approve" ? ApproveDiscountChangeBody : RejectDiscountChangeBody).safeParse(body);
-    if (!parsed.success) return invalid([{ field: kind === "approve" ? "version" : "reason", reason: "invalid" }]);
+    const parsed = ApproveDiscountChangeBody.safeParse(body);
+    if (!parsed.success) return invalid([{ field: "version", reason: "invalid" }]);
     if (kind === "reject") {
-      const reason = (parsed.data as { reason: string }).reason.trim();
+      const rejected = RejectDiscountChangeBody.safeParse(body);
+      if (!rejected.success) return invalid([{ field: "reason", reason: "invalid" }]);
+      const reason = rejected.data.reason.trim();
       if (Array.from(reason).length < REASON_MIN || Array.from(reason).length > REASON_MAX) return invalid([{ field: "reason", reason: "size" }]);
     }
     if (parsed.data.version !== discount.version) return failure("stale-version", 409);
