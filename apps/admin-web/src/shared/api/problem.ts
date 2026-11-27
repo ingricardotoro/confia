@@ -73,6 +73,9 @@ export const KNOWN_PROBLEM_CODES = [
   "discount-scope-locked",
   "discount-assignment-overlap",
   "invalid-discount-assignment-state",
+  "discount-pending-approval",
+  "invalid-discount-change-state",
+  "discount-terms-changed",
 ] as const;
 
 export type ProblemCode = (typeof KNOWN_PROBLEM_CODES)[number];

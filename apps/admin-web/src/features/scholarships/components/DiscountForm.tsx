@@ -20,7 +20,7 @@ export interface DiscountFormProps {
   readonly conceptLookupFailure?: { readonly onRetry: () => void } | undefined;
   /** The concepts loaded and none is active: a discount has nothing to cover yet. */
   readonly noConcepts: boolean;
-  /** An approved assignment or an issued charge uses the discount: the type and the value cannot change, and the scope can only shrink. */
+  /** An approved assignment or an issued charge uses the discount: the type, the value and the stackable mark cannot change, and the scope can only shrink. */
   readonly inUse: boolean;
   readonly onChange: (field: DiscountField, value: string) => void;
   readonly onBlur: (field: DiscountField) => void;
@@ -99,6 +99,11 @@ export function DiscountForm({
       ) : (
         <ReadOnlyField label={t("scholarships.discounts.form.kind")} controlId={DISCOUNT_CONTROL_IDS.kind} value={kindLabel(values.kind)} />
       )}
+      {values.kind === "campaign" ? (
+        <Alert variant="info">
+          <p>{t("scholarships.discounts.form.campaignApprovalNote")}</p>
+        </Alert>
+      ) : null}
       {inUse ? (
         <Alert variant="info">
           <p>{t("scholarships.discounts.form.inUse")}</p>
@@ -137,22 +142,31 @@ export function DiscountForm({
         <TextField label={t("scholarships.discounts.form.validFrom")} required kind="date" {...text("validFrom")} />
         <TextField label={t("scholarships.discounts.form.validTo")} required kind="date" description={t("scholarships.discounts.form.validToHelp")} {...text("validTo")} />
       </FieldGrid>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id={DISCOUNT_CONTROL_IDS.stackable}
-            aria-describedby={stackableHelpId}
-            checked={values.stackable === "true"}
-            onCheckedChange={(next) => {
-              onChange("stackable", next === true ? "true" : "false");
-            }}
-          />
-          <Label htmlFor={DISCOUNT_CONTROL_IDS.stackable}>{t("scholarships.discounts.form.stackable")}</Label>
+      {inUse ? (
+        // In use, the mark is locked like the type and the value (S8): it is shown, not offered.
+        <ReadOnlyField
+          label={t("scholarships.discounts.form.stackable")}
+          controlId={DISCOUNT_CONTROL_IDS.stackable}
+          value={t(values.stackable === "true" ? "scholarships.discounts.stackableYes" : "scholarships.discounts.stackableNo")}
+        />
+      ) : (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={DISCOUNT_CONTROL_IDS.stackable}
+              aria-describedby={stackableHelpId}
+              checked={values.stackable === "true"}
+              onCheckedChange={(next) => {
+                onChange("stackable", next === true ? "true" : "false");
+              }}
+            />
+            <Label htmlFor={DISCOUNT_CONTROL_IDS.stackable}>{t("scholarships.discounts.form.stackable")}</Label>
+          </div>
+          <p id={stackableHelpId} className="text-sm text-text-secondary">
+            {t("scholarships.discounts.form.stackableHelp")}
+          </p>
         </div>
-        <p id={stackableHelpId} className="text-sm text-text-secondary">
-          {t("scholarships.discounts.form.stackableHelp")}
-        </p>
-      </div>
+      )}
       {conceptLookupFailure === undefined ? null : (
         <Alert variant="warning">
           <p>{t("resource.optionsFailed")}</p>

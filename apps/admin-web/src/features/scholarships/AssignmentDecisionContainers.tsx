@@ -1,5 +1,3 @@
-import { useRef } from "react";
-import { intentFor, type IdempotentIntent } from "../../shared/forms/idempotent-intent.ts";
 import { useAccessForm } from "../../shared/forms/use-access-form.ts";
 import { fieldSpecs } from "../../shared/resource-screen/resource-form.ts";
 import {
@@ -13,6 +11,7 @@ import { awardReasonOf } from "./award-model.ts";
 import type { DiscountAssignment } from "./discounts-types.ts";
 import { assignmentFailureOf } from "./scholarships-failure.ts";
 import { useApproveAssignment, useRejectAssignment, useRevokeAssignment } from "./use-assignment-queries.ts";
+import { useDecisionIntent } from "./use-decision-intent.ts";
 
 export interface AssignmentDecisionContainerProps {
   readonly assignment: DiscountAssignment;
@@ -28,25 +27,17 @@ export interface AssignmentDecisionContainerProps {
  */
 export function ApproveAssignmentContainer({ assignment, onClose, onDecided }: AssignmentDecisionContainerProps) {
   const approving = useApproveAssignment();
-  const intent = useRef<IdempotentIntent | undefined>(undefined);
+  const decide = useDecisionIntent(assignmentFailureOf);
 
   const form = useAccessForm<never>({
     fields: {},
     validate: () => ({}),
-    submit: async () => {
-      const current = intentFor(intent.current, JSON.stringify(["approve", assignment.id]));
-      intent.current = current;
-      try {
-        await approving.mutateAsync({ assignmentId: assignment.id, body: undefined, idempotencyKey: current.idempotencyKey });
-        intent.current = undefined;
-        onDecided();
-        return undefined;
-      } catch (error) {
-        const { failure, outcomeUnknown } = assignmentFailureOf(error);
-        if (!outcomeUnknown) intent.current = undefined;
-        return failure;
-      }
-    },
+    submit: () =>
+      decide(
+        JSON.stringify(["approve", assignment.id]),
+        (idempotencyKey) => approving.mutateAsync({ assignmentId: assignment.id, body: undefined, idempotencyKey }),
+        onDecided,
+      ),
     waitingKey: "scholarships.assignments.approve.sending",
   });
 
@@ -57,27 +48,16 @@ type ReasonMutation = ReturnType<typeof useRejectAssignment>;
 
 /** The shared behavior of the two decisions that need a reason of 20 to 500 characters: validate it, send once, and keep the intent while the outcome is unknown. */
 function useReasonDecision(assignment: DiscountAssignment, kind: "reject" | "revoke", mutation: ReasonMutation, controlId: string, onDecided: () => void) {
-  const intent = useRef<IdempotentIntent | undefined>(undefined);
+  const decide = useDecisionIntent(assignmentFailureOf);
   return useAccessForm<"reason">({
     fields: fieldSpecs({ reason: controlId }, { reason: "" }, ["reason"]),
     validate: (values) => {
       const reason = awardReasonOf(values.reason);
       return reason === undefined ? {} : { reason };
     },
-    submit: async (values) => {
+    submit: (values) => {
       const body = { reason: values.reason.trim() };
-      const current = intentFor(intent.current, JSON.stringify([kind, assignment.id, body]));
-      intent.current = current;
-      try {
-        await mutation.mutateAsync({ assignmentId: assignment.id, body, idempotencyKey: current.idempotencyKey });
-        intent.current = undefined;
-        onDecided();
-        return undefined;
-      } catch (error) {
-        const { failure, outcomeUnknown } = assignmentFailureOf(error);
-        if (!outcomeUnknown) intent.current = undefined;
-        return failure;
-      }
+      return decide(JSON.stringify([kind, assignment.id, body]), (idempotencyKey) => mutation.mutateAsync({ assignmentId: assignment.id, body, idempotencyKey }), onDecided);
     },
     waitingKey: kind === "reject" ? "scholarships.assignments.reject.sending" : "scholarships.assignments.revoke.sending",
   });

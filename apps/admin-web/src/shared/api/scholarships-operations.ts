@@ -12,10 +12,12 @@ import {
   type AwardPageResponseOutput,
   type AwardResponseOutput,
   type CreateDiscountRequest,
+  type ApproveDiscountChangeBody,
   type CreateScholarshipRequest,
   type DiscountPageResponseOutput,
   type DiscountResponseOutput,
   type RejectDiscountAssignmentBody,
+  type RejectDiscountChangeBody,
   type RejectScholarshipAwardBody,
   type RequestAwardRequest,
   type RequestDiscountAssignmentRequest,
@@ -149,6 +151,18 @@ export const deactivateDiscount = (token: string, id: string): Promise<ApiResult
 
 export const reactivateDiscount = (token: string, id: string): Promise<ApiResult<Discount>> =>
   request({ method: "POST", path: `${discountPath(id)}/reactivate`, headers: bearer(token), schema: DiscountResponse });
+
+/**
+ * Approves what waits for another person on a campaign discount: its creation, or a proposal to widen or reactivate it. The body names the version the
+ * person saw, so a decision is never taken on terms that changed. The server refuses the person who created or proposed it. The decision is permanent and
+ * carries the key of its intent.
+ */
+export const approveDiscountChange = (token: string, id: string, body: ApproveDiscountChangeBody, idempotencyKey: string): Promise<ApiResult<Discount>> =>
+  request({ method: "POST", path: `${discountPath(id)}/approve`, headers: withKey(token, idempotencyKey), body, schema: DiscountResponse });
+
+/** Rejects what waits on a campaign discount, with the reason (20 to 500 characters) and the version the person saw. */
+export const rejectDiscountChange = (token: string, id: string, body: RejectDiscountChangeBody, idempotencyKey: string): Promise<ApiResult<Discount>> =>
+  request({ method: "POST", path: `${discountPath(id)}/reject`, headers: withKey(token, idempotencyKey), body, schema: DiscountResponse });
 
 export interface DiscountAssignmentListParams extends PageParams {
   readonly status?: AwardStatus | undefined;

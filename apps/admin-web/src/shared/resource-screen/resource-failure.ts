@@ -57,6 +57,9 @@ const MESSAGE_CODES: ReadonlySet<string> = new Set([
   "discount-scope-locked",
   "discount-assignment-overlap",
   "invalid-discount-assignment-state",
+  "discount-pending-approval",
+  "invalid-discount-change-state",
+  "discount-terms-changed",
 ]);
 
 /** The text of each reason the server gives for a split of the responsibility that does not hold. */

@@ -137,7 +137,7 @@ export function AppShellContainer({
   if (signedIn.read === "loading") return <SignedInPage status="loading" />;
 
   return (
-    <PermissionsProvider permissions={signedIn.permissions}>
+    <PermissionsProvider permissions={signedIn.permissions} accountId={signedIn.accountId}>
       <ShellFrame
         entries={entries}
         guards={guards}

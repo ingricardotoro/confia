@@ -46,14 +46,25 @@ export function useResourceView<Row>() {
     announce: (message: string) => {
       setNotice({ tone: "success", message });
     },
-    toggle: async <R,>(id: string, name: string, nextActive: boolean, run: () => Promise<R>, warningOf?: (result: R) => string | undefined) => {
+    /**
+     * Activates or deactivates a row. `messageOf` lets the screen say something else when the answer is not what the person asked (a reactivation that the
+     * server only took as a proposal to approve): when it returns a text, that text replaces the usual one.
+     */
+    toggle: async <R,>(
+      id: string,
+      name: string,
+      nextActive: boolean,
+      run: () => Promise<R>,
+      warningOf?: (result: R) => string | undefined,
+      messageOf?: (result: R) => string | undefined,
+    ) => {
       if (toggling.current) return;
       toggling.current = true;
       setTogglingId(id);
       setNotice(undefined);
       try {
         const result = await run();
-        const message = t(nextActive ? "resource.activated" : "resource.deactivated", { name });
+        const message = messageOf?.(result) ?? t(nextActive ? "resource.activated" : "resource.deactivated", { name });
         const warning = warningOf?.(result);
         setNotice({ tone: "success", message: warning === undefined ? message : `${message} ${warning}` });
       } catch (error) {

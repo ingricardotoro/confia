@@ -2,7 +2,7 @@ import { paymentBody, paymentPage, paymentPostingAccount, paymentPostingAccountM
 import type { CashboxModel } from "./cashbox-model.ts";
 import type { ChargeVoidModel } from "./charge-void-model.ts";
 import { ACCOUNT_IDS } from "./ledger-seed.ts";
-import type { ModelResponse } from "./session-model.ts";
+import { SESSION_ACCOUNT, type ModelResponse } from "./session-model.ts";
 import type { StatementModel } from "./statement-model.ts";
 import { studentId, type StudentRows } from "./students-seed.ts";
 
@@ -42,7 +42,7 @@ const STATUSES = ["declared", "confirmed", "rejected"] as const;
 const METHODS = ["CASH", "BANK_TRANSFER"] as const;
 
 /** The person who signs in with the simulator: who registers every payment of the journeys. */
-export const ME = "00000000-0000-4000-8000-0000000000a1";
+export const ME = SESSION_ACCOUNT;
 /** Another person, who registered the declared transfer the seed holds and who may be asked to confirm. */
 const OTHER = "00000000-0000-4000-8000-0000000000c9";
 export const paymentId = (n: number): string => `00000000-0000-4000-8000-${String(600_000 + n).padStart(12, "0")}`;

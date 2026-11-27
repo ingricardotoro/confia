@@ -298,7 +298,8 @@ describe("creating, editing and deactivating a discount", () => {
     await user.click(screen.getByRole("button", { name: "Editar Campaña de matrícula" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar el descuento" }, TIMEOUT);
 
-    expect(within(dialog).getByText(/ya está en uso .*su tipo y su valor no se pueden cambiar/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/ya está en uso .*su tipo, su valor y su marca de acumulable no se pueden cambiar/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "Acumulable con los demás beneficios" })).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText(/^Porcentaje/)).toHaveAttribute("readonly");
     expect(within(dialog).queryByRole("combobox", { name: /Tipo de beneficio/ })).not.toBeInTheDocument();
   });
@@ -311,7 +312,7 @@ describe("creating, editing and deactivating a discount", () => {
     const dialog = await screen.findByRole("dialog", { name: "Editar el descuento" }, TIMEOUT);
     await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
 
-    expect(await within(dialog).findByText(/su tipo y su valor no se pueden cambiar. Cree otro descuento con el nuevo valor/, undefined, TIMEOUT)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/su tipo, su valor y su marca de acumulable no se pueden cambiar. Cree otro descuento con el nuevo valor/, undefined, TIMEOUT)).toBeInTheDocument();
     expect(within(dialog).getByText(/Identificador para soporte: 01J8Z4K2QF9P0X/)).toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Editar el descuento" })).toBeInTheDocument();
   });
