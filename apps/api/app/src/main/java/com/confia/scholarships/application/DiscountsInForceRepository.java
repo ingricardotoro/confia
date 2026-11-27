@@ -16,12 +16,17 @@ import java.util.UUID;
 public interface DiscountsInForceRepository {
 
     /** A discount in force with its benefit. */
-    record InForce(UUID discountId, String discountCode, boolean stackable, Benefit benefit) {
+    record InForce(UUID discountId, String discountCode, UUID assignmentId, boolean stackable, Benefit benefit) {
 
         public InForce {
             Objects.requireNonNull(discountId, "discountId");
             Objects.requireNonNull(discountCode, "discountCode");
             Objects.requireNonNull(benefit, "benefit");
+        }
+
+        /** A discount of campaign kind: no assignment makes it apply. */
+        public InForce(UUID discountId, String discountCode, boolean stackable, Benefit benefit) {
+            this(discountId, discountCode, null, stackable, benefit);
         }
     }
 
