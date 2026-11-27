@@ -52,11 +52,16 @@ class DiscountBenefitsIT extends ScholarshipsFixture {
         return new World(env, actorOf(env.institution(), "academic_coordinator"), actorOf(env.institution(), "administrator"));
     }
 
+    /** Creates the discount; a campaign one is approved by another person at once, as it applies only then. */
     private DiscountView discount(World w, String code, String kind, String points, boolean stackable, LocalDate from,
             LocalDate to) {
-        return manageDiscounts().create(w.administrator(), request(), code, kind,
+        return settled(w, manageDiscounts().create(w.administrator(), request(), code, kind,
                 new ManageDiscounts.Draft("Descuento " + code, "PERCENTAGE", points, null, from, to, stackable,
-                        Set.of(w.concept())));
+                        Set.of(w.concept()))));
+    }
+
+    private DiscountView settled(World w, DiscountView created) {
+        return created.approvalStatus().equals("pending") ? approvedByAnother(w.institution(), created) : created;
     }
 
     private DiscountView campaign(World w, String code, String points) {
@@ -175,8 +180,13 @@ class DiscountBenefitsIT extends ScholarshipsFixture {
         assertThat(inForce(w, 0, FEB)).isEmpty();
         assertThat(applicable(w.institution(), w.institution(), w.student(0), w.concept(), FEB)).isFalse();
 
-        manageDiscounts().reactivate(w.administrator(), request(), camp.id());
+        // Reactivating a campaign discount is a proposal: it applies again only once another person approves it.
+        DiscountView asked = manageDiscounts().reactivate(w.administrator(), request(), camp.id());
         manageDiscounts().reactivate(w.administrator(), request(), conv.id());
+        assertThat(asked.active()).isFalse();
+        assertThat(asked.pendingChange().reactivate()).isTrue();
+        assertThat(inForce(w, 0, FEB)).hasSize(1);
+        approvedByAnother(w.institution(), asked);
         assertThat(inForce(w, 0, FEB)).hasSize(2);
     }
 
@@ -201,8 +211,8 @@ class DiscountBenefitsIT extends ScholarshipsFixture {
     @Test
     void everyDiscountInForceComesInTheOrderOfTheCascadeAndTheRowsCanBeLockedInShareMode() throws SQLException {
         World w = world();
-        manageDiscounts().create(w.administrator(), request(), "B-FIJO", "campaign",
-                new ManageDiscounts.Draft("Fijo", "FIXED_AMOUNT", null, "50.00", FROM, TO, true, Set.of(w.concept())));
+        settled(w, manageDiscounts().create(w.administrator(), request(), "B-FIJO", "campaign",
+                new ManageDiscounts.Draft("Fijo", "FIXED_AMOUNT", null, "50.00", FROM, TO, true, Set.of(w.concept()))));
         discount(w, "Z-PCT", "campaign", "5", true, FROM, TO);
         approved(w, agreement(w, "A-PCT", "10"), 0, FEB, JUN);
 

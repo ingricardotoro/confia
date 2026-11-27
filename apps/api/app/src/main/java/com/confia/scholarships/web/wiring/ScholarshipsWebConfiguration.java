@@ -2,6 +2,7 @@ package com.confia.scholarships.web.wiring;
 
 import com.confia.scholarships.application.DecideAward;
 import com.confia.scholarships.application.DecideDiscountAssignment;
+import com.confia.scholarships.application.DecideDiscountChange;
 import com.confia.scholarships.application.ManageDiscounts;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
@@ -39,8 +40,8 @@ public class ScholarshipsWebConfiguration {
     }
 
     @Bean
-    DiscountController discountController(ManageDiscounts manageDiscounts) {
-        return new DiscountController(manageDiscounts);
+    DiscountController discountController(ManageDiscounts manageDiscounts, DecideDiscountChange decideChange) {
+        return new DiscountController(manageDiscounts, decideChange);
     }
 
     @Bean

@@ -157,6 +157,10 @@ class PermissionedEndpointsTest {
                 Permission.SCHOLARSHIPS_CREATE));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discounts/{id}/reactivate",
                 Permission.SCHOLARSHIPS_CREATE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discounts/{id}/approve",
+                Permission.SCHOLARSHIPS_APPROVE));
+        expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discounts/{id}/reject",
+                Permission.SCHOLARSHIPS_APPROVE));
         expected.add(new PermissionedEndpoint(HttpMethod.GET, "/api/v1/scholarships/discount-assignments",
                 Permission.SCHOLARSHIPS_READ));
         expected.add(new PermissionedEndpoint(HttpMethod.POST, "/api/v1/scholarships/discount-assignments",

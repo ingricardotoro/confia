@@ -542,6 +542,11 @@
       },
       "AssignmentResponse" : {
         "properties" : {
+          "benefitType" : {
+            "description" : "The type of the benefit of the discount at the request",
+            "enum" : [ "PERCENTAGE", "FIXED_AMOUNT" ],
+            "type" : [ "string", "null" ]
+          },
           "decision" : {
             "$ref" : "#/components/schemas/AssignmentDecisionResponse",
             "description" : "The approval or the rejection, once there is one"
@@ -556,9 +561,23 @@
           "discountName" : {
             "type" : [ "string", "null" ]
           },
+          "discountVersion" : {
+            "description" : "The version of the discount when the assignment was requested: the approval is bound to it, and refused with discount-terms-changed when the discount changed since; absent for an assignment from before it was kept",
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "fixedAmount" : {
+            "$ref" : "#/components/schemas/ScholarshipMoney",
+            "description" : "Only FIXED_AMOUNT",
+            "type" : "null"
+          },
           "id" : {
             "format" : "uuid",
             "type" : "string"
+          },
+          "percent" : {
+            "description" : "Percentage points with two decimals; only PERCENTAGE",
+            "type" : [ "string", "null" ]
           },
           "requestedAt" : {
             "format" : "date-time",
@@ -1675,6 +1694,70 @@
         "required" : [ "decidedAt", "decidedBy", "id", "kind" ],
         "type" : "object"
       },
+      "DiscountChangeResponse" : {
+        "properties" : {
+          "benefitType" : {
+            "enum" : [ "PERCENTAGE", "FIXED_AMOUNT" ],
+            "type" : "string"
+          },
+          "concepts" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ConceptResponse"
+            },
+            "type" : "array"
+          },
+          "fixedAmount" : {
+            "$ref" : "#/components/schemas/ScholarshipMoney",
+            "description" : "Only FIXED_AMOUNT",
+            "type" : "null"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "percent" : {
+            "description" : "Percentage points with two decimals; only PERCENTAGE",
+            "type" : [ "string", "null" ]
+          },
+          "reactivate" : {
+            "description" : "Whether approving it also turns the discount on",
+            "type" : "boolean"
+          },
+          "requestedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "description" : "Who proposed it: never the one who approves it",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "stackable" : {
+            "type" : "boolean"
+          },
+          "validFrom" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "validTo" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "benefitType", "concepts", "name", "reactivate", "requestedAt", "requestedBy", "stackable", "validFrom", "validTo" ],
+        "type" : "object"
+      },
+      "DiscountDecisionRequest" : {
+        "properties" : {
+          "version" : {
+            "description" : "The version of the discount the decider saw",
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "version" ],
+        "type" : "object"
+      },
       "DiscountPageResponse" : {
         "properties" : {
           "items" : {
@@ -1704,6 +1787,11 @@
           "active" : {
             "type" : "boolean"
           },
+          "approvalStatus" : {
+            "description" : "Whether the terms of a campaign discount were approved by another person; an agreement discount is always approved",
+            "enum" : [ "pending", "approved", "rejected" ],
+            "type" : "string"
+          },
           "benefitType" : {
             "enum" : [ "PERCENTAGE", "FIXED_AMOUNT" ],
             "type" : "string"
@@ -1719,6 +1807,11 @@
           },
           "createdAt" : {
             "format" : "date-time",
+            "type" : "string"
+          },
+          "createdBy" : {
+            "description" : "Who created it: never the one who approves its creation",
+            "format" : "uuid",
             "type" : "string"
           },
           "fixedAmount" : {
@@ -1739,6 +1832,11 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "pendingChange" : {
+            "$ref" : "#/components/schemas/DiscountChangeResponse",
+            "description" : "The terms proposed (to widen or reactivate), waiting for another person; the terms above are the ones in force",
+            "type" : "null"
           },
           "percent" : {
             "description" : "Percentage points with two decimals; only PERCENTAGE",
@@ -1764,7 +1862,7 @@
             "type" : "integer"
           }
         },
-        "required" : [ "active", "benefitType", "code", "concepts", "createdAt", "id", "inUse", "kind", "name", "stackable", "updatedAt", "validFrom", "validTo", "version" ],
+        "required" : [ "active", "approvalStatus", "benefitType", "code", "concepts", "createdAt", "createdBy", "id", "inUse", "kind", "name", "stackable", "updatedAt", "validFrom", "validTo", "version" ],
         "type" : "object"
       },
       "EnrollStudentRequest" : {
@@ -3532,6 +3630,24 @@
           }
         },
         "required" : [ "amount", "method", "receivedOn", "studentId" ],
+        "type" : "object"
+      },
+      "RejectDiscountChangeRequest" : {
+        "properties" : {
+          "reason" : {
+            "maxLength" : 500,
+            "minLength" : 20,
+            "pattern" : "^[^\\p{Cc}\\p{Cf}]*$",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "The version of the discount the decider saw",
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "reason", "version" ],
         "type" : "object"
       },
       "RejectPaymentRequest" : {
@@ -16650,6 +16766,127 @@
         "x-required-permission" : "scholarships:create"
       }
     },
+    "/api/v1/scholarships/discounts/{id}/approve" : {
+      "post" : {
+        "description" : "A campaign discount applies to nothing until a person other than the one who created it approves it, and a proposal to widen it (another type of benefit or a greater value, an earlier start or a later end, a concept more, stackable turned on) or to reactivate it changes nothing until a person other than the one who proposed it approves it. Approving makes it the terms in force from then on; the charges already issued do not change. The body names the version of the discount the person saw. The Idempotency-Key header is required and stored permanently on the decision. Needs the permission scholarships:approve.",
+        "operationId" : "approveDiscountChange",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "1 to 128 visible characters, unique per request",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DiscountDecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DiscountResponse"
+                }
+              }
+            },
+            "description" : "The discount, approved (or the discount the key already approved)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the Idempotency-Key is not valid (validation-failed, idempotency-key-missing)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold scholarships:approve, the Origin is missing or not allowed (forbidden, csrf-invalid), or the actor asked for what waits (self-approval-forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The discount does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Nothing waits for a decision (invalid-discount-change-state), the version is not the current one (stale-version), a concept the proposal adds is inactive (inactive-reference), or the database refuses the terms because the discount is in use (discount-benefit-locked, discount-scope-locked)"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Idempotency-Key was used for another request (idempotency-payload-mismatch)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Approves the creation of a campaign discount or a proposal on it",
+        "tags" : [ "discounts" ],
+        "x-required-permission" : "scholarships:approve"
+      }
+    },
     "/api/v1/scholarships/discounts/{id}/deactivate" : {
       "post" : {
         "description" : "The discount takes no new assignment and stops applying to the charges issued afterwards; the charges already issued do not change. Deactivating an inactive discount changes nothing. Needs the permission scholarships:create.",
@@ -16794,6 +17031,127 @@
         "summary" : "Reactivates a discount",
         "tags" : [ "discounts" ],
         "x-required-permission" : "scholarships:create"
+      }
+    },
+    "/api/v1/scholarships/discounts/{id}/reject" : {
+      "post" : {
+        "description" : "Rejects what waits on a campaign discount with a reason of 20 to 500 characters, kept only in the decision: a proposal is dropped and the terms in force stay; a creation is rejected for good and the discount never applies. Whoever asked for what waits cannot reject it. The body names the version of the discount the person saw. The Idempotency-Key header is required and stored permanently on the decision. Needs the permission scholarships:approve.",
+        "operationId" : "rejectDiscountChange",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "1 to 128 visible characters, unique per request",
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RejectDiscountChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DiscountResponse"
+                }
+              }
+            },
+            "description" : "The discount, after the rejection (or the discount the key already rejected)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The body or the Idempotency-Key is not valid (validation-failed, idempotency-key-missing)"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The account does not hold scholarships:approve, the Origin is missing or not allowed (forbidden, csrf-invalid), or the actor asked for what waits (self-approval-forbidden)"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The discount does not exist in the institution of the token (resource-not-found)"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Nothing waits for a decision (invalid-discount-change-state) or the version is not the current one (stale-version)"
+          },
+          "422" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "The Idempotency-Key was used for another request (idempotency-payload-mismatch)"
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unexpected failure (internal-error)"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Rejects the creation of a campaign discount or a proposal on it",
+        "tags" : [ "discounts" ],
+        "x-required-permission" : "scholarships:approve"
       }
     },
     "/api/v1/scholarships/{id}" : {

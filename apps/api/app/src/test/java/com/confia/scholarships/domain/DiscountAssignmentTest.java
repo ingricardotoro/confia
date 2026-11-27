@@ -53,7 +53,7 @@ class DiscountAssignmentTest {
 
     @Test
     void anAssignmentOfAnInactiveDiscountIsRefused() {
-        Discount inactive = agreement().withActive(false, NOW);
+        Discount inactive = agreement().withActive(false, REQUESTER, NOW);
 
         assertThatThrownBy(() -> DiscountAssignment.request(UUID.randomUUID(), inactive, UUID.randomUUID(), FROM, TO, REQUESTER,
                 NOW)).isInstanceOf(InactiveReferenceException.class);
@@ -191,5 +191,46 @@ class DiscountAssignmentTest {
         assertThat(rejected.appliesOn(FROM)).isFalse();
         DiscountAssignment revoked = approved.decided(approved.revoke(UUID.randomUUID(), APPROVER, REASON, NOW, "k4", HASH));
         assertThat(revoked.appliesOn(FROM)).isFalse();
+    }
+
+    // --- H2: the approval is bound to the terms the assignment was requested for ---
+
+    @Test
+    void theAssignmentKeepsTheVersionAndTheBenefitOfTheDiscountItWasRequestedFor() {
+        Discount discount = agreement();
+
+        DiscountAssignment assignment = DiscountAssignment.request(UUID.randomUUID(), discount, UUID.randomUUID(), FROM, TO,
+                REQUESTER, NOW);
+
+        assertThat(assignment.discountVersion()).isEqualTo(discount.version());
+        assertThat(assignment.benefit()).isEqualTo(discount.benefit());
+        assignment.requireTermsOf(discount);
+        assertThat(assignment.decided(assignment.approve(UUID.randomUUID(), APPROVER, NOW, KEY, HASH)).discountVersion())
+                .isEqualTo(discount.version());
+    }
+
+    @Test
+    void anEditOfTheDiscountAfterTheRequestMakesTheApprovalRefusedWhateverWasEdited() {
+        Discount discount = agreement();
+        DiscountAssignment assignment = DiscountAssignment.request(UUID.randomUUID(), discount, UUID.randomUUID(), FROM, TO,
+                REQUESTER, NOW);
+
+        Discount raised = discount.edit(0, REQUESTER, "Convenio", Benefit.percentage("90"), FROM, TO, discount.concepts(), true,
+                false, NOW);
+        Discount renamed = discount.edit(0, REQUESTER, "Otro nombre", discount.benefit(), FROM, TO, discount.concepts(), true,
+                false, NOW);
+
+        assertThatThrownBy(() -> assignment.requireTermsOf(raised)).isInstanceOf(DiscountTermsChangedException.class);
+        assertThatThrownBy(() -> assignment.requireTermsOf(renamed)).as("the version moved").isInstanceOf(
+                DiscountTermsChangedException.class);
+    }
+
+    @Test
+    void anAssignmentFromBeforeTheTermsWereKeptIsNeverApproved() {
+        Discount discount = agreement();
+        DiscountAssignment legacy = new DiscountAssignment(UUID.randomUUID(), discount.id(), UUID.randomUUID(), FROM, TO,
+                AwardStatus.PENDING, REQUESTER, NOW, null, null);
+
+        assertThatThrownBy(() -> legacy.requireTermsOf(discount)).isInstanceOf(DiscountTermsChangedException.class);
     }
 }

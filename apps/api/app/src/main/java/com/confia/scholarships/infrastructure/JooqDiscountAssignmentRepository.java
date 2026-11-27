@@ -47,6 +47,10 @@ public final class JooqDiscountAssignmentRepository implements DiscountAssignmen
                 .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.STATUS, assignment.status().code())
                 .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.REQUESTED_BY, assignment.requestedBy())
                 .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.REQUESTED_AT, ScholarshipsWrites.toDatabase(assignment.requestedAt()))
+                .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.DISCOUNT_VERSION, assignment.discountVersion())
+                .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.BENEFIT_TYPE, BenefitColumns.type(assignment.benefit()))
+                .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.PERCENT, BenefitColumns.percent(assignment.benefit()))
+                .set(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.FIXED_AMOUNT, BenefitColumns.fixedAmount(assignment.benefit()))
                 .execute());
     }
 
@@ -128,6 +132,10 @@ public final class JooqDiscountAssignmentRepository implements DiscountAssignmen
                 row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.VALID_FROM), row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.VALID_TO),
                 AwardStatus.ofCode(row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.STATUS)).orElseThrow(),
                 row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.REQUESTED_BY),
-                ScholarshipsWrites.fromDatabase(row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.REQUESTED_AT)));
+                ScholarshipsWrites.fromDatabase(row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.REQUESTED_AT)),
+                row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.DISCOUNT_VERSION),
+                BenefitColumns.read(row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.BENEFIT_TYPE),
+                        row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.PERCENT), row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.FIXED_AMOUNT),
+                        "HNL"));
     }
 }

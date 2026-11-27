@@ -4,6 +4,7 @@ import com.confia.kernel.InstitutionId;
 import com.confia.scholarships.domain.AssignmentDecision;
 import com.confia.scholarships.domain.DecisionKind;
 import com.confia.scholarships.domain.DecisionReason;
+import com.confia.scholarships.domain.Discount;
 import com.confia.scholarships.domain.DiscountAssignment;
 import com.confia.scholarships.domain.ResourceNotFoundException;
 import com.confia.shared.audit.AuditLogWriter;
@@ -70,6 +71,7 @@ public final class DecideDiscountAssignment {
      * @throws com.confia.scholarships.domain.InvalidAssignmentStateException when it is not pending
      * @throws com.confia.scholarships.domain.SelfApprovalForbiddenException when the actor requested it
      * @throws com.confia.scholarships.domain.InactiveReferenceException when its discount is inactive
+     * @throws com.confia.scholarships.domain.DiscountTermsChangedException when its discount changed since the request
      * @throws com.confia.scholarships.domain.DiscountAssignmentOverlapException when the student has another approved assignment of
      *         the discount in those days
      */
@@ -148,8 +150,11 @@ public final class DecideDiscountAssignment {
             }
             AssignmentDecision decision = deciding.on(assignment, UUID.randomUUID(), clock.instant(), key, hash);
             if (decision.kind() == DecisionKind.APPROVED) {
-                discounts.findById(institution, assignment.discountId()).orElseThrow(ResourceNotFoundException::new)
-                        .requireActive();
+                Discount discount = discounts.findById(institution, assignment.discountId())
+                        .orElseThrow(ResourceNotFoundException::new);
+                discount.requireActive();
+                // Approved only for the terms it was requested for: the one who requested it cannot edit the discount in between.
+                assignment.requireTermsOf(discount);
             }
             decisions.insert(institution, decision);
             assignments.advanceStatus(institution, assignment.id(), decision.kind().leadsTo());

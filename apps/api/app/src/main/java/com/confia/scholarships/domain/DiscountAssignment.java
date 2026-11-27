@@ -14,10 +14,18 @@ import java.util.UUID;
  *
  * <p>The accrual engine applies an assignment only when it is approved and in force on the issue date of the charge ({@link
  * #appliesOn}), and so only to the charges that are issued after the approval: an issued charge never changes. The life of an
- * assignment uses the statuses of an award ({@link AwardStatus}) and the decisions of {@link DecisionKind}: they are the same cycle.
+* assignment uses the statuses of an award ({@link AwardStatus}) and the decisions of {@link DecisionKind}: they are the same cycle.
+ *
+ * <p>It keeps the version of the discount and its benefit as they were when it was requested (the terms the second person is asked
+ * to approve): it is approved only while the discount still has them ({@link #requireTermsOf}), so the one who requests it cannot
+ * edit the discount in between and get something else approved. An assignment from before that was kept has neither and is never
+ * approved.
+ *
+ * @param discountVersion the version of the discount at the request, or {@code null} for an assignment from before it was kept
+ * @param benefit the benefit of the discount at the request, or {@code null} likewise
  */
 public record DiscountAssignment(UUID id, UUID discountId, UUID studentId, LocalDate validFrom, LocalDate validTo,
-        AwardStatus status, UUID requestedBy, Instant requestedAt) {
+        AwardStatus status, UUID requestedBy, Instant requestedAt, Long discountVersion, Benefit benefit) {
 
     private static final LocalDate WINDOW_START = LocalDate.of(2000, 1, 1);
     private static final LocalDate WINDOW_END = LocalDate.of(2100, 12, 31);
@@ -50,7 +58,8 @@ public record DiscountAssignment(UUID id, UUID discountId, UUID studentId, Local
             throw new InvalidScholarshipsValueException("validTo", "invalid");
         }
         discount.requireAssignable(validFrom, validTo);
-        return new DiscountAssignment(id, discount.id(), studentId, validFrom, validTo, AwardStatus.PENDING, requestedBy, now);
+        return new DiscountAssignment(id, discount.id(), studentId, validFrom, validTo, AwardStatus.PENDING, requestedBy, now,
+                discount.version(), discount.benefit());
     }
 
     /**
@@ -94,7 +103,7 @@ public record DiscountAssignment(UUID id, UUID discountId, UUID studentId, Local
     /** This assignment once the decision is recorded. */
     public DiscountAssignment decided(AssignmentDecision decision) {
         return new DiscountAssignment(id, discountId, studentId, validFrom, validTo, decision.kind().leadsTo(), requestedBy,
-                requestedAt);
+                requestedAt, discountVersion, benefit);
     }
 
     /**
@@ -110,6 +119,19 @@ public record DiscountAssignment(UUID id, UUID discountId, UUID studentId, Local
         }
         if (requestedBy.equals(by)) {
             throw new SelfApprovalForbiddenException();
+        }
+    }
+
+    /**
+     * Checks that the discount still has the version and the benefit this assignment was requested for.
+     *
+     * @throws DiscountTermsChangedException when it changed since the request (or the assignment kept no terms)
+     */
+    public void requireTermsOf(Discount discount) {
+        Objects.requireNonNull(discount, "discount");
+        if (discountVersion == null || benefit == null || discountVersion != discount.version()
+                || !benefit.sameAs(discount.benefit())) {
+            throw new DiscountTermsChangedException();
         }
     }
 
