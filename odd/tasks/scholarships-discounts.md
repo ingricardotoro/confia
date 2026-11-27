@@ -17,7 +17,7 @@ Branch: `feat/scholarships-discounts`. Delivery: ask-on-risk (split PRs over 800
 | ID | Specs | Route | Status | Evidence |
 |---|---|---|---|---|
 | T0 | S1, S3, S4 | inline | done: cut note written | |
-| T1 | S1, S4, S6 | delegated (context backstop) to confia-backend-dev | pending | |
+| T1 | S1, S4, S6 | delegated (context backstop) to confia-backend-dev | done: V39 + domain + use cases + routes + OpenAPI; 128 new tests green (DiscountTest 41, DiscountAssignmentTest 14, DiscountBenefitsServiceTest 10, DiscountsIT 39, DiscountBenefitsIT 9, DiscountsEndpointsIT 15); inventories, OpenApiContractSnapshotTest, architecture and process-bean tests green | 0ffc7d89 (schema + domain), 86acf1ff (use cases + adapters + read port), 2ad9276f (routes + contract + inventories), a8feaa89 (read-port tests), docs commit below |
 | T2 | S1, S2, S3, S6 | delegated (context backstop) to confia-backend-dev | pending | |
 | T3 | S1, S5 | delegated to confia-frontend-dev | pending | |
 | T4 | S5 | delegated reviewers | pending | |
@@ -33,3 +33,4 @@ T3 = contracts and screens. T4 = reviews and fixes. T5 = roadmap line and cut no
 - L2 (2026-11-26, user): stacking "En cascada (Recommended)"; agreement assignment "Con aprobación (Recommended)".
 - L3: lessons from the cut-1 merge: each stacked slice must pass frontend CI alone (contract fixtures, route inventory AW59, dependency-cruiser `admin-presentation-is-pure`); do not run Prettier on admin-web src.
 - L4 (2026-11-26, user): "si" — confirms the four S6 assumptions.
+- L5 (2026-11-26, T1 backend): done on `feat/scholarships-discounts`. Covered S1 (backend part), S4 (request by one person, approval by another, `403 self-approval-forbidden`, DB-enforced), S6 (stackable scholarship; percentage before fixed amount, then by code, ordering delivered by `DiscountBenefits.inForce`; `scholarships:*` permissions). Added rule not in the cut note: shortening a discount validity that would leave a pending or approved assignment outside is refused (`400 validation-failed`, `validTo`, `assignments-outside-validity`). T2 hooks: "in use" = approved or revoked assignment today (extend `scholarships_discount_guard`, `scholarships_discount_concept_before_insert` and `DiscountAssignmentRepository.inUse` with issued charges); `DiscountBenefits` is registered for admin and worker but `charges` is untouched. `packages/contracts` not regenerated (T3).
