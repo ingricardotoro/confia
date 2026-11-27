@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { PERMISSION_CODES } from "../../shared/permissions/permission-codes.ts";
@@ -134,6 +134,45 @@ describe("a pending assignment", () => {
     expect(JSON.parse(posts("reject")[0]?.body ?? "{}")).toEqual({ reason: REASON });
     expect(keyOf(posts("reject")[0])).not.toBe("");
     expect(await screen.findByText(REASON, undefined, TIMEOUT)).toBeInTheDocument();
+  });
+});
+
+describe("the terms an assignment is approved on (H2)", () => {
+  it("shows the benefit and the version of the discount the assignment was requested for, in the detail and in the approval dialog", async () => {
+    const user = userEvent.setup();
+    await open(pending({ benefitType: "FIXED_AMOUNT", percent: null, fixedAmount: { amount: "250.00", currency: "HNL" }, discountVersion: 3 }));
+
+    expect(screen.getByText("Beneficio solicitado")).toBeInTheDocument();
+    expect(screen.getByText("L 250.00")).toBeInTheDocument();
+    expect(screen.getByText("Versión del descuento")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Aprobar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Aprobar la asignación" }, TIMEOUT);
+    expect(within(dialog).getByText("Beneficio solicitado")).toBeInTheDocument();
+    expect(within(dialog).getByText("L 250.00")).toBeInTheDocument();
+  });
+
+  it("says that an assignment from before the terms were kept cannot be approved and has to be requested again", async () => {
+    await open(pending({ benefitType: null, percent: null, discountVersion: null }));
+
+    expect(screen.getByText(/se solicitó antes de que se guardaran los términos del descuento, por lo que no se puede aprobar/)).toBeInTheDocument();
+  });
+
+  it("tells in the dialog that the discount changed since the request, keeps it open, and reads the assignment again", async () => {
+    const user = userEvent.setup();
+    await open();
+    route("post", `${ASSIGNMENT}/approve`, problem("discount-terms-changed", 409, { traceId: "01J8Z4K2QF9P0X" }));
+    const before = requests().filter((sent) => sent.method === "GET" && sent.path === ASSIGNMENT).length;
+    await user.click(screen.getByRole("button", { name: "Aprobar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Aprobar la asignación" }, TIMEOUT);
+    await user.click(within(dialog).getByRole("button", { name: "Aprobar asignación" }));
+
+    expect(await within(dialog).findByText(/Los términos del descuento cambiaron después de solicitar esta asignación.*solicite la asignación otra vez/, undefined, TIMEOUT)).toBeInTheDocument();
+    expect(within(dialog).getByText(/01J8Z4K2QF9P0X/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(requests().filter((sent) => sent.method === "GET" && sent.path === ASSIGNMENT).length).toBeGreaterThan(before);
+    }, TIMEOUT);
   });
 });
 

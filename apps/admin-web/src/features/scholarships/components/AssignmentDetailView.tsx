@@ -4,6 +4,7 @@ import { formatInstant, formatIsoDate } from "../../../shared/format/format-date
 import { BackLink } from "../../../shared/layout/components/BackLink.tsx";
 import type { ResourceNotice } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
 import { discountLabelOf, type DiscountAssignment } from "../discounts-types.ts";
+import { AssignmentTermsRows } from "./AssignmentTermsRows.tsx";
 import { AwardStatusBadge } from "./AwardStatusBadge.tsx";
 
 export type AssignmentDetailState =
@@ -124,6 +125,11 @@ export function AssignmentDetailView({ state, backHref, onBack, notice, onApprov
               <p>{t("scholarships.assignments.detail.pendingNote")}</p>
             </Alert>
           ) : null}
+          {state.assignment.status === "pending" && state.assignment.discountVersion == null ? (
+            <Alert variant="warning">
+              <p>{t("scholarships.assignments.detail.noTermsNote")}</p>
+            </Alert>
+          ) : null}
           {state.assignment.status === "revoked" ? (
             <Alert variant="info">
               <p>{t("scholarships.assignments.detail.revokedNote")}</p>
@@ -135,6 +141,7 @@ export function AssignmentDetailView({ state, backHref, onBack, notice, onApprov
             <dd>{state.assignment.studentCode ?? t("scholarships.assignments.detail.noValue")}</dd>
             <dt className="text-text-secondary">{t("scholarships.assignments.detail.fields.discount")}</dt>
             <dd>{discountLabelOf(state.assignment) ?? t("scholarships.assignments.detail.noValue")}</dd>
+            <AssignmentTermsRows assignment={state.assignment} />
             <dt className="text-text-secondary">{t("scholarships.assignments.detail.fields.validity")}</dt>
             <dd>
               {t("scholarships.assignments.detail.validityValue", { from: formatIsoDate(state.assignment.validFrom), to: formatIsoDate(state.assignment.validTo) })}

@@ -51,7 +51,12 @@ test.describe("the agreement assignments", () => {
     await clickNavigationLink(page, "Asignaciones de convenio");
     await page.getByRole("row", { name: /E-000001.*Pendiente de aprobación/ }).first().getByRole("link").click();
     await expect(page.getByRole("heading", { level: 2, name: "Asignación del estudiante E-000001" })).toBeVisible(SAVE);
+    // The terms the assignment was requested for are shown before approving it.
+    await expect(page.getByText("Beneficio solicitado")).toBeVisible();
+    await expect(page.getByText("20.00 %")).toBeVisible();
+    await expect(page.getByText("Versión del descuento")).toBeVisible();
     await page.getByRole("button", { name: "Aprobar" }).click();
+    await expect(dialog(page).getByText("Beneficio solicitado")).toBeVisible();
     await dialog(page).getByRole("button", { name: "Aprobar asignación" }).click();
     await expect(page.getByText(/La asignación quedó aprobada/)).toBeVisible(SAVE);
     await expect(page.getByRole("button", { name: "Revocar" })).toBeVisible(SAVE);
@@ -67,6 +72,26 @@ test.describe("the agreement assignments", () => {
     await dialog(page).getByRole("button", { name: "Revocar asignación" }).click();
     await expect(page.getByText(/La asignación quedó revocada/)).toBeVisible(SAVE);
     await expect(page.getByText(REASON)).toBeVisible(SAVE);
+    await expectNoBlockingViolations(page);
+  });
+
+  test("refuses to approve an assignment after its discount changed, and says to request it again", async ({ page }) => {
+    await seedSession(page);
+    // The agreement discount is renamed after the assignment was requested: its version changes, so the approval of the old terms is refused.
+    await clickNavigationLink(page, "Descuentos");
+    await page.getByRole("button", { name: "Editar Convenio con la empresa" }).click();
+    await dialog(page).getByLabel(/^Nombre/).fill("Convenio con la empresa 2026");
+    await dialog(page).getByRole("button", { name: "Guardar" }).click();
+    await expect(page.getByText(/Se guardaron los cambios de «Convenio con la empresa 2026»/)).toBeVisible(SAVE);
+
+    await clickNavigationLink(page, "Asignaciones de convenio");
+    await page.getByRole("row", { name: /E-000001.*Pendiente de aprobación/ }).first().getByRole("link").click();
+    await expect(page.getByRole("heading", { level: 2, name: "Asignación del estudiante E-000001" })).toBeVisible(SAVE);
+    await page.getByRole("button", { name: "Aprobar" }).click();
+    await dialog(page).getByRole("button", { name: "Aprobar asignación" }).click();
+    await expect(dialog(page).getByText(/Los términos del descuento cambiaron después de solicitar esta asignación/)).toBeVisible(SAVE);
+    await expect(dialog(page).getByText(/solicite la asignación otra vez/)).toBeVisible();
+    await dialog(page).getByRole("button", { name: "Cancelar" }).click();
     await expectNoBlockingViolations(page);
   });
 });
