@@ -108,6 +108,7 @@ class DiscountBenefitsIT extends ScholarshipsFixture {
             assertThat(inForce(w, student, FEB)).singleElement().satisfies(found -> {
                 assertThat(found.discountId()).isEqualTo(created.id());
                 assertThat(found.discountCode()).isEqualTo("CAMP-10");
+                assertThat(found.assignmentId()).as("a campaign applies by itself, without an assignment").isNull();
                 assertThat(found.stackable()).isTrue();
                 assertThat(found.percentage()).isTrue();
                 assertThat(found.on(BASE)).isEqualTo(Money.of("100.00", CurrencyCode.HNL));
@@ -133,9 +134,12 @@ class DiscountBenefitsIT extends ScholarshipsFixture {
     void anAgreementDiscountAppliesOnlyToTheStudentWithAnApprovedAssignmentInForceBothEndsIncluded() throws SQLException {
         World w = world();
         DiscountView created = agreement(w, "CONV-10", "10");
-        approved(w, created, 0, FEB, JUN);
+        AssignmentView assignment = approved(w, created, 0, FEB, JUN);
 
-        assertThat(inForce(w, 0, FEB)).singleElement().satisfies(found -> assertThat(found.discountCode()).isEqualTo("CONV-10"));
+        assertThat(inForce(w, 0, FEB)).singleElement().satisfies(found -> {
+            assertThat(found.discountCode()).isEqualTo("CONV-10");
+            assertThat(found.assignmentId()).as("the approved assignment that makes it apply").isEqualTo(assignment.id());
+        });
         assertThat(inForce(w, 0, JUN)).hasSize(1);
         assertThat(inForce(w, 0, FEB.minusDays(1))).isEmpty();
         assertThat(inForce(w, 0, JUN.plusDays(1))).isEmpty();
