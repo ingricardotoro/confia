@@ -10,15 +10,23 @@ import java.util.Optional;
  * item, the terms of the concept, its prices and its tax rate, it answers the charge or refuses it with the {@link
  * AccrualErrorCode}. One date, the pricing date (the first day of the period), decides both the price and the tax rate. The
  * pipeline is {@code BasePrice -> BenefitsStep -> TaxableBase -> Tax -> Total}: the benefits step offers what the awards in force
- * give on the base, the greatest of them is applied (INV-15: never above the base), and the tax of a taxable concept is computed on
- * the base that is left.
+ * give on the base (the greatest scholarship is the only one that is ever a candidate) and the discounts step what the discounts in
+ * force give; {@link BenefitStacking} decides which apply and by how much (INV-15: in cascade when all are stackable, otherwise only
+ * the greatest, and never above the base), and the tax of a taxable concept is computed on the base that is left.
  */
 public final class ChargeEvaluator {
 
     private final BenefitsStep benefits;
+    private final DiscountsStep discounts;
 
+    /** The evaluator of a charge that only a scholarship can reduce. */
     public ChargeEvaluator(BenefitsStep benefits) {
+        this(benefits, DiscountsStep.NONE);
+    }
+
+    public ChargeEvaluator(BenefitsStep benefits, DiscountsStep discounts) {
         this.benefits = Objects.requireNonNull(benefits, "benefits");
+        this.discounts = Objects.requireNonNull(discounts, "discounts");
     }
 
     /** The evaluator of a charge that no award can reduce. */
@@ -46,8 +54,12 @@ public final class ChargeEvaluator {
         PriceResolver.ResolvedPrice price = PriceResolver.resolve(prices, student.gradeId(), student.modalityId(),
                 period.start());
         Money base = price.amount();
-        Optional<BenefitOffer> applied = BenefitSelection.best(benefits.offersOn(base), base.currency());
-        Money discount = applied.map(BenefitOffer::amount).orElseGet(() -> Money.zero(base.currency()));
+        Optional<BenefitOffer> scholarship = BenefitSelection.best(benefits.offersOn(base), base.currency());
+        List<AppliedBenefit> applied = BenefitStacking.apply(base, scholarship, discounts.inForceOn(base));
+        Money discount = Money.zero(base.currency());
+        for (AppliedBenefit benefit : applied) {
+            discount = discount.add(benefit.amount());
+        }
         if (discount.isNegative() || discount.isGreaterThan(base)) {
             throw new InvalidChargesValueException();
         }
@@ -56,6 +68,6 @@ public final class ChargeEvaluator {
                 : ChargeTax.none(base.currency());
         ChargeAmounts amounts = ChargeAmounts.of(base, discount, tax.amount());
         return new ComputedCharge(student.studentId(), student.enrollmentId(), planId, planPeriod.planItemId(),
-                concept.conceptId(), concept.category(), period, price.priceListItemId(), amounts, tax, applied.orElse(null));
+                concept.conceptId(), concept.category(), period, price.priceListItemId(), amounts, tax, applied);
     }
 }

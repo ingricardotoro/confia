@@ -40,7 +40,7 @@ public final class DiscountBenefitsService implements DiscountBenefits {
             return List.of();
         }
         return discounts.find(institution, studentId, paymentConceptId, on, lockShare).stream().sorted(CASCADE_ORDER)
-                .map(found -> new Applicable(found.discountId(), found.discountCode(), found.stackable(),
+                .map(found -> new Applicable(found.discountId(), found.discountCode(), found.assignmentId(), found.stackable(),
                         found.benefit().type() == BenefitType.PERCENTAGE, base -> found.benefit().on(base, null)))
                 .toList();
     }

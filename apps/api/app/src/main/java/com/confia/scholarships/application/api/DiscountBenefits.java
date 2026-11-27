@@ -33,15 +33,23 @@ import java.util.function.UnaryOperator;
 public interface DiscountBenefits {
 
     /**
-     * One discount in force: its identifier and code, whether it is stackable, whether its benefit is a percentage, and the function
+     * One discount in force: its identifier and code, the approved assignment that makes it apply to the student (absent for a
+     * campaign discount, which applies to everybody), whether it is stackable, whether its benefit is a percentage, and the function
      * that gives its benefit on a base (never negative, never above the base; zero for a base that is not positive).
      */
-    record Applicable(UUID discountId, String discountCode, boolean stackable, boolean percentage, UnaryOperator<Money> benefit) {
+    record Applicable(UUID discountId, String discountCode, UUID assignmentId, boolean stackable, boolean percentage,
+            UnaryOperator<Money> benefit) {
 
         public Applicable {
             Objects.requireNonNull(discountId, "discountId");
             Objects.requireNonNull(discountCode, "discountCode");
             Objects.requireNonNull(benefit, "benefit");
+        }
+
+        /** A discount that applies without an assignment (a campaign discount). */
+        public Applicable(UUID discountId, String discountCode, boolean stackable, boolean percentage,
+                UnaryOperator<Money> benefit) {
+            this(discountId, discountCode, null, stackable, percentage, benefit);
         }
 
         /** The benefit of this discount on {@code base}. */

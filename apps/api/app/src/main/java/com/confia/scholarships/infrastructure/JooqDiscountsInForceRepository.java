@@ -49,7 +49,7 @@ public final class JooqDiscountsInForceRepository implements DiscountsInForceRep
                 .and(covers(institution, List.of(paymentConceptId)));
         SelectForUpdateStep<?> agreement = dsl.select(SCHOLARSHIPS_DISCOUNT.ID, SCHOLARSHIPS_DISCOUNT.CODE,
                 SCHOLARSHIPS_DISCOUNT.BENEFIT_TYPE, SCHOLARSHIPS_DISCOUNT.PERCENT, SCHOLARSHIPS_DISCOUNT.FIXED_AMOUNT,
-                SCHOLARSHIPS_DISCOUNT.CURRENCY, SCHOLARSHIPS_DISCOUNT.IS_STACKABLE)
+                SCHOLARSHIPS_DISCOUNT.CURRENCY, SCHOLARSHIPS_DISCOUNT.IS_STACKABLE, SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.ID)
                 .from(SCHOLARSHIPS_DISCOUNT)
                 .join(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT)
                 .on(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.INSTITUTION_ID.eq(SCHOLARSHIPS_DISCOUNT.INSTITUTION_ID)
@@ -120,7 +120,10 @@ public final class JooqDiscountsInForceRepository implements DiscountsInForceRep
         Benefit benefit = type == BenefitType.PERCENTAGE
                 ? new Benefit(type, Percentage.of(row.get(SCHOLARSHIPS_DISCOUNT.PERCENT)), null)
                 : new Benefit(type, null, MoneyColumns.toMoney(row.get(SCHOLARSHIPS_DISCOUNT.FIXED_AMOUNT), currency));
-        return new InForce(row.get(SCHOLARSHIPS_DISCOUNT.ID), row.get(SCHOLARSHIPS_DISCOUNT.CODE),
+        // The campaign query does not select the assignment: the field is absent from its rows.
+        UUID assignmentId = row.field(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.ID) == null ? null
+                : row.get(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.ID);
+        return new InForce(row.get(SCHOLARSHIPS_DISCOUNT.ID), row.get(SCHOLARSHIPS_DISCOUNT.CODE), assignmentId,
                 row.get(SCHOLARSHIPS_DISCOUNT.IS_STACKABLE), benefit);
     }
 }
