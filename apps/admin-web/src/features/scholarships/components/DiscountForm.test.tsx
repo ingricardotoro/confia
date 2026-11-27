@@ -69,18 +69,43 @@ describe("DiscountForm", () => {
     expect(dialog.getByRole("checkbox", { name: "MATR · Matrícula" })).not.toBeChecked();
   });
 
-  it("locks the type and the value of a discount in use, shows them as read only and says why", () => {
+  it("locks the type, the value and the stackable mark of a discount in use, shows them as read only and says why", () => {
     const row = discount({ inUse: true });
     renderWithAdminI18n(<DiscountForm {...props({ mode: "edit", inUse: true, values: initialDiscountValues(row) })} />);
 
     const dialog = within(screen.getByRole("dialog", { name: "Editar el descuento" }));
-    expect(dialog.getByText(/ya está en uso .*su tipo y su valor no se pueden cambiar, la vigencia solo puede acortarse y los conceptos solo pueden quitarse/)).toBeInTheDocument();
+    expect(dialog.getByText(/ya está en uso .*su tipo, su valor y su marca de acumulable no se pueden cambiar, la vigencia solo puede acortarse y los conceptos solo pueden quitarse/)).toBeInTheDocument();
     expect(dialog.getByLabelText(/^Porcentaje/)).toHaveAttribute("readonly");
     expect(dialog.getByLabelText(/^Tipo de beneficio/)).toHaveValue("Porcentaje");
     expect(dialog.queryByRole("combobox", { name: /Tipo de beneficio/ })).not.toBeInTheDocument();
-    // What can still change is still editable: the name, the validity and the stackable mark.
+    // S8: the stackable mark is shown as text, read only, and cannot be toggled.
+    expect(dialog.queryByRole("checkbox", { name: "Acumulable con los demás beneficios" })).not.toBeInTheDocument();
+    expect(dialog.getByLabelText("Acumulable con los demás beneficios")).toHaveAttribute("readonly");
+    expect(dialog.getByLabelText("Acumulable con los demás beneficios")).toHaveValue("Acumulable");
+    // What can still change is still editable: the name and the validity.
     expect(dialog.getByLabelText(/^Nombre/)).not.toHaveAttribute("readonly");
     expect(dialog.getByLabelText(/^Vigente hasta/)).not.toHaveAttribute("readonly");
+  });
+
+  it("shows a discount in use that does not stack as not stackable, still read only", () => {
+    const row = discount({ inUse: true, stackable: false });
+    renderWithAdminI18n(<DiscountForm {...props({ mode: "edit", inUse: true, values: initialDiscountValues(row) })} />);
+
+    expect(screen.getByLabelText("Acumulable con los demás beneficios")).toHaveValue("No acumulable");
+  });
+
+  it("keeps the stackable mark editable while the discount is not in use", () => {
+    renderWithAdminI18n(<DiscountForm {...props({ mode: "edit", values: initialDiscountValues(discount({ stackable: true })) })} />);
+
+    expect(within(screen.getByRole("dialog")).getByRole("checkbox", { name: "Acumulable con los demás beneficios" })).toBeEnabled();
+  });
+
+  it("tells a campaign discount that it needs another person to approve it, and an agreement discount nothing of the kind", () => {
+    const { rerender } = renderWithAdminI18n(<DiscountForm {...props({ values: { ...initialDiscountValues(), kind: "campaign" } })} />);
+    expect(screen.getByText(/nace pendiente y no se aplica a ningún cargo hasta que otra persona con permiso de aprobación lo apruebe/)).toBeInTheDocument();
+
+    rerender(<DiscountForm {...props({ values: { ...initialDiscountValues(), kind: "agreement" } })} />);
+    expect(screen.queryByText(/nace pendiente/)).not.toBeInTheDocument();
   });
 
   it("leaves the type and the value editable while the discount is not in use", () => {

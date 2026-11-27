@@ -56,3 +56,22 @@ export function assignmentFailureOf(error: unknown): { readonly failure: AccessF
   const { failure, outcomeUnknown } = awardFailureOf(error);
   return error instanceof ApiFailure ? { failure: classifyAssignmentFailure(error.result), outcomeUnknown } : { failure, outcomeUnknown };
 }
+
+/**
+ * Sorts a failed decision of a campaign discount: whoever created the discount or proposed the change cannot decide it (`self-approval-forbidden`), with the
+ * text of the discounts, and every other code goes through the classifier of the awards (the reason of a decision worded as a bounded text, and the
+ * business codes of the shared classifier: a decision already taken, another version, a missing permission).
+ */
+export function classifyDiscountFailure(result: ApiFailureResult): AccessFailure {
+  if (result.kind === "problem" && result.problem.code === "self-approval-forbidden") {
+    const { traceId } = result.problem;
+    return { kind: "message", key: "scholarships.errors.discountSelfApproval", ...(traceId === undefined ? {} : { traceId }) };
+  }
+  return classifyAwardFailure(result);
+}
+
+/** What a rejected decision of a discount holds, as the failure a dialog shows and whether the server may have done it (so the same intent is sent again). */
+export function discountFailureOf(error: unknown): { readonly failure: AccessFailure; readonly outcomeUnknown: boolean } {
+  const { failure, outcomeUnknown } = awardFailureOf(error);
+  return error instanceof ApiFailure ? { failure: classifyDiscountFailure(error.result), outcomeUnknown } : { failure, outcomeUnknown };
+}

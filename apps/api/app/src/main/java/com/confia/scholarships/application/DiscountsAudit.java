@@ -3,9 +3,12 @@ package com.confia.scholarships.application;
 import com.confia.scholarships.domain.AssignmentDecision;
 import com.confia.scholarships.domain.AwardStatus;
 import com.confia.scholarships.domain.Benefit;
+import com.confia.scholarships.domain.DecisionKind;
 import com.confia.scholarships.domain.DecisionReason;
 import com.confia.scholarships.domain.Discount;
 import com.confia.scholarships.domain.DiscountAssignment;
+import com.confia.scholarships.domain.DiscountDecision;
+import com.confia.scholarships.domain.DiscountProposal;
 import com.confia.shared.audit.AuditEntry;
 import com.confia.shared.audit.AuditJson;
 import com.confia.shared.security.AuthenticatedActor;
@@ -45,6 +48,22 @@ final class DiscountsAudit {
         return entry(actor, requestId, DISCOUNT + action, DISCOUNT, after.id(), json(before), json(after), null, null);
     }
 
+    /** A proposal to widen or reactivate a campaign discount, which another person decides: the terms in force and the ones proposed. */
+    static AuditEntry discountChangeRequested(AuthenticatedActor actor, UUID requestId, Discount before, Discount after) {
+        return entry(actor, requestId, DISCOUNT + ".change_requested", DISCOUNT, after.id(), json(before), json(after), null, null);
+    }
+
+    /**
+     * The approval or the rejection of the creation of a campaign discount or of a proposal on it: the second person is recorded as the
+     * approver of an approval. A rejection holds the SHA-256 of its reason and its length, never its text.
+     */
+    static AuditEntry discountDecided(AuthenticatedActor actor, UUID requestId, Discount before, Discount after,
+            DiscountDecision decision, DecisionReason reason) {
+        boolean approved = decision.kind() == DecisionKind.APPROVED;
+        return entry(actor, requestId, DISCOUNT + "." + decision.kind().code(), DISCOUNT, after.id(), json(before), json(after),
+                reason == null ? null : ScholarshipsAudit.sha256Hex(reason.text()), approved ? decision.decidedBy() : null);
+    }
+
     static AuditEntry assignmentRequested(AuthenticatedActor actor, UUID requestId, DiscountAssignment assignment) {
         return entry(actor, requestId, ASSIGNMENT + ".requested", ASSIGNMENT, assignment.id(), null, json(assignment), null, null);
     }
@@ -56,6 +75,7 @@ final class DiscountsAudit {
                 .text("decisionId", decision.id().toString()).text("discountId", assignment.discountId().toString())
                 .text("studentId", assignment.studentId().toString()).text("validFrom", assignment.validFrom().toString())
                 .text("validTo", assignment.validTo().toString());
+        terms(after, assignment);
         if (reason != null) {
             after.number("reasonLength", reason.length());
         }
@@ -70,22 +90,56 @@ final class DiscountsAudit {
 
     private static String json(Discount discount) {
         AuditJson.Builder json = AuditJson.object().text("code", discount.code()).text("name", discount.name())
-                .text("kind", discount.kind().code()).text("benefitType", discount.benefit().type().name());
-        if (discount.benefit().percent() != null) {
-            json.text("percent", discount.benefit().percent().toPlainString());
-        } else {
-            json.text("fixedAmount", discount.benefit().fixedAmount().toPlainString());
-        }
-        return json.text("currency", Benefit.CURRENCY.name()).text("validFrom", discount.validFrom().toString())
+                .text("kind", discount.kind().code());
+        benefit(json, "", discount.benefit());
+        json.text("currency", Benefit.CURRENCY.name()).text("validFrom", discount.validFrom().toString())
                 .text("validTo", discount.validTo().toString()).bool("stackable", discount.stackable())
-                .text("conceptIds", discount.concepts().stream().map(UUID::toString).sorted().collect(Collectors.joining(",")))
-                .bool("active", discount.active()).number("version", discount.version()).toJson();
+                .text("conceptIds", conceptIds(discount.concepts())).bool("active", discount.active())
+                .number("version", discount.version()).text("approvalStatus", discount.approval().code());
+        DiscountProposal proposal = discount.proposal();
+        if (proposal != null) {
+            json.text("proposedName", proposal.name());
+            benefit(json, "proposed", proposal.benefit());
+            json.text("proposedValidFrom", proposal.validFrom().toString()).text("proposedValidTo", proposal.validTo().toString())
+                    .bool("proposedStackable", proposal.stackable()).bool("proposedReactivate", proposal.reactivate())
+                    .text("proposedConceptIds", conceptIds(proposal.concepts()))
+                    .text("proposedBy", proposal.requestedBy().toString());
+        }
+        return json.toJson();
+    }
+
+    /** The type and the value of a benefit, with the prefix of the proposal ("proposed") or none. */
+    private static void benefit(AuditJson.Builder json, String prefix, Benefit benefit) {
+        json.text(key(prefix, "benefitType"), benefit.type().name());
+        if (benefit.percent() != null) {
+            json.text(key(prefix, "percent"), benefit.percent().toPlainString());
+        } else {
+            json.text(key(prefix, "fixedAmount"), benefit.fixedAmount().toPlainString());
+        }
+    }
+
+    private static String key(String prefix, String name) {
+        return prefix.isEmpty() ? name : prefix + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
+
+    private static String conceptIds(java.util.Set<UUID> ids) {
+        return ids.stream().map(UUID::toString).sorted().collect(Collectors.joining(","));
     }
 
     private static String json(DiscountAssignment assignment) {
-        return AuditJson.object().text("discountId", assignment.discountId().toString())
+        AuditJson.Builder json = AuditJson.object().text("discountId", assignment.discountId().toString())
                 .text("studentId", assignment.studentId().toString()).text("validFrom", assignment.validFrom().toString())
-                .text("validTo", assignment.validTo().toString()).text("status", assignment.status().code()).toJson();
+                .text("validTo", assignment.validTo().toString()).text("status", assignment.status().code());
+        terms(json, assignment);
+        return json.toJson();
+    }
+
+    /** The terms the assignment was requested for: the version of the discount and its benefit. */
+    private static void terms(AuditJson.Builder json, DiscountAssignment assignment) {
+        if (assignment.discountVersion() != null) {
+            json.number("discountVersion", assignment.discountVersion());
+            benefit(json, "", assignment.benefit());
+        }
     }
 
     private static AuditEntry entry(AuthenticatedActor actor, UUID requestId, String action, String entityType, UUID entityId,

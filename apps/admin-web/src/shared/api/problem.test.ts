@@ -98,6 +98,9 @@ describe("the known codes", () => {
         "discount-scope-locked",
         "discount-assignment-overlap",
         "invalid-discount-assignment-state",
+        "discount-pending-approval",
+        "invalid-discount-change-state",
+        "discount-terms-changed",
       ].sort(),
     );
   });

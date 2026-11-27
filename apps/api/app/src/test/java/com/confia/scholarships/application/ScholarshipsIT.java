@@ -850,4 +850,45 @@ class ScholarshipsIT extends ScholarshipsFixture {
                 new RequestAward.Command(foreign.id(), mine.student(0), mine.year(), FEB, JUN)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    // --- L1: the requester of an award is the account of the session ---
+
+    @Test
+    void theDatabaseRefusesAnAwardRequestedInTheNameOfAnotherAccountOrOfNobody() throws SQLException {
+        World w = world();
+        ScholarshipView scholarship = scholarship(w, "BECA-25", "25");
+        String insert = "insert into scholarships_award (institution_id, id, scholarship_id, student_id, academic_year_id, "
+                + "valid_from, valid_to, requested_by) values (?, ?, ?, ?, ?, date '2027-02-01', date '2027-06-30', ?)";
+
+        // The session is the coordinator's and the row names the administrator: nobody requests in the name of another.
+        assertThatThrownBy(() -> execAsActor(w, w.coordinator().accountId(), insert, w.institution(), UUID.randomUUID(),
+                scholarship.id(), w.student(0), w.year(), w.administrator().accountId())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("requested by the person of the session");
+        // No session account at all.
+        assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), scholarship.id(), w.student(0),
+                w.year(), w.administrator().accountId())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("requested by the person of the session");
+        // The account of the session may.
+        execAsActor(w, w.coordinator().accountId(), insert, w.institution(), UUID.randomUUID(), scholarship.id(), w.student(0),
+                w.year(), w.coordinator().accountId());
+        assertThat(scalar(w.institution(), "select count(*) from scholarships_award where institution_id = ?", w.institution()))
+                .isEqualTo(1);
+    }
+
+    /** One statement as the owner, with the person of the session set as the application does for every use case. */
+    private static void execAsActor(World w, UUID actor, String sql, Object... parameters) throws SQLException {
+        try (Connection c = com.confia.support.StaffRoleFixtures.ownerTransaction(w.institution())) {
+            try (PreparedStatement context = c.prepareStatement("select set_config('app.actor_id', ?, true)")) {
+                context.setString(1, actor.toString());
+                context.execute();
+            }
+            try (PreparedStatement s = c.prepareStatement(sql)) {
+                for (int i = 0; i < parameters.length; i++) {
+                    s.setObject(i + 1, parameters[i]);
+                }
+                s.executeUpdate();
+            }
+            c.commit();
+        }
+    }
 }

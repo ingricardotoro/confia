@@ -219,4 +219,40 @@ class ChargeBenefitsMigrationIT {
         }
     }
 
+    /**
+     * M1: a line is written in the transaction that wrote its charge. A charge from before the lines existed (it has a benefit and no
+     * line, as V37 and V38 left it) used to accept one line equal to its whole benefit; now no line is added to a charge issued earlier,
+     * not even that one, and the refusal is the one of the rule and not of a later check.
+     */
+    @Test
+    void aLineIsNeverAddedToAChargeThatWasIssuedInAnEarlierTransaction() throws SQLException {
+        Database database = create();
+        try {
+            migrate(database, null);
+            UUID legacy = UUID.randomUUID();
+            try (Connection c = superuser(database); Statement s = c.createStatement()) {
+                s.execute("set session_replication_role = replica");
+                // A benefit of 100.00 with no scholarship and no line, committed before this test writes anything.
+                insertLegacyCharge(c, legacy, FEB, "100.00", "150.00", "1150.00", false);
+            }
+
+            try (Connection c = admin(database);
+                    PreparedStatement line = c.prepareStatement("insert into charges_charge_benefit (institution_id, charge_id, "
+                            + "position, source, discount_id, discount_code, amount, currency) values (?, ?, 1, 'DISCOUNT', ?, "
+                            + "'CAMP-10', 100.00, 'HNL')")) {
+                line.setObject(1, INSTITUTION);
+                line.setObject(2, legacy);
+                line.setObject(3, UUID.randomUUID());
+                assertThatThrownBy(line::executeUpdate).isInstanceOf(SQLException.class)
+                        .hasMessageContaining("written in the transaction that wrote its charge");
+            }
+            try (Connection c = superuser(database); Statement s = c.createStatement();
+                    ResultSet rs = s.executeQuery("select count(*) from charges_charge_benefit")) {
+                rs.next();
+                assertThat(rs.getInt(1)).isZero();
+            }
+        } finally {
+            drop(database);
+        }
+    }
 }

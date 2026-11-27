@@ -7,6 +7,7 @@ import com.confia.scholarships.ScholarshipsFixture;
 import com.confia.scholarships.domain.DiscountAssignmentOverlapException;
 import com.confia.scholarships.domain.DiscountBenefitLockedException;
 import com.confia.scholarships.domain.DiscountScopeLockedException;
+import com.confia.scholarships.domain.DiscountTermsChangedException;
 import com.confia.scholarships.domain.DuplicateDiscountCodeException;
 import com.confia.scholarships.domain.IdempotencyKeyRequiredException;
 import com.confia.scholarships.domain.InactiveReferenceException;
@@ -84,7 +85,13 @@ class DiscountsIT extends ScholarshipsFixture {
         return manageDiscounts().create(w.administrator(), request(), code, "agreement", draft(w, points, true));
     }
 
+    /** A campaign discount that applies: created by the administrator and approved by another person. */
     private DiscountView campaign(World w, String code, String points) {
+        return approvedByAnother(w.institution(), pendingCampaign(w, code, points));
+    }
+
+    /** A campaign discount that waits for the approval of another person. */
+    private DiscountView pendingCampaign(World w, String code, String points) {
         return manageDiscounts().create(w.administrator(), request(), code, "campaign", draft(w, points, true));
     }
 
@@ -185,7 +192,7 @@ class DiscountsIT extends ScholarshipsFixture {
     @Test
     void anEditNeedsTheVersionAndAdvancesIt() throws SQLException {
         World w = world();
-        DiscountView created = campaign(w, "CAMP-10", "10");
+        DiscountView created = agreement(w, "CONV-10", "10");
 
         DiscountView edited = manageDiscounts().update(w.administrator(), request(), created.id(), 0,
                 new ManageDiscounts.Draft("Nuevo nombre", "PERCENTAGE", "15", null, FEB, JUN, false, Set.of(w.env().concept())));
@@ -195,14 +202,14 @@ class DiscountsIT extends ScholarshipsFixture {
         assertThat(edited.percent()).isEqualTo("15.00");
         assertThat(edited.validFrom()).isEqualTo(FEB);
         assertThat(edited.stackable()).isFalse();
-        assertThat(edited.code()).isEqualTo("CAMP-10");
+        assertThat(edited.code()).isEqualTo("CONV-10");
         assertThat(auditEntries(w, "scholarships.discount.updated")).isEqualTo(1);
         assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), created.id(), 0, draft(w, "20", true)))
                 .isInstanceOf(StaleVersionException.class);
     }
 
     @Test
-    void onceAnAssignmentWasApprovedTheBenefitIsLockedButTheNameAndTheStackableFlagChange() throws SQLException {
+    void onceAnAssignmentWasApprovedTheBenefitAndTheStackableFlagAreLockedButTheNameChanges() throws SQLException {
         World w = world();
         DiscountView created = agreement(w, "CONV-10", "10");
         approved(w, requested(w, created, 0, FEB, JUN));
@@ -212,10 +219,15 @@ class DiscountsIT extends ScholarshipsFixture {
         assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), created.id(), 0,
                 new ManageDiscounts.Draft("N", "FIXED_AMOUNT", null, "10.00", FROM, TO, true, Set.of(w.env().concept()))))
                 .isInstanceOf(DiscountBenefitLockedException.class);
+        // S8: the stackable flag is locked like the type and the value (docs/cortes/scholarships-discounts.md).
+        assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), created.id(), 0,
+                new ManageDiscounts.Draft("Otro nombre", "PERCENTAGE", "10", null, FROM, TO, false, Set.of(w.env().concept()))))
+                .isInstanceOf(DiscountBenefitLockedException.class);
+        assertThat(manageDiscounts().get(w.administrator(), request(), created.id()).stackable()).isTrue();
         DiscountView edited = manageDiscounts().update(w.administrator(), request(), created.id(), 0,
-                new ManageDiscounts.Draft("Otro nombre", "PERCENTAGE", "10", null, FROM, TO, false, Set.of(w.env().concept())));
+                new ManageDiscounts.Draft("Otro nombre", "PERCENTAGE", "10", null, FROM, TO, true, Set.of(w.env().concept())));
         assertThat(edited.name()).isEqualTo("Otro nombre");
-        assertThat(edited.stackable()).isFalse();
+        assertThat(edited.stackable()).isTrue();
         assertThat(edited.inUse()).isTrue();
     }
 
@@ -322,6 +334,23 @@ class DiscountsIT extends ScholarshipsFixture {
                 w.institution(), created.id())).isInstanceOf(SQLException.class);
     }
 
+    /** One statement as the owner, with the person of the session set as the application does for every use case. */
+    private static void execAsActor(World w, UUID actor, String sql, Object... parameters) throws SQLException {
+        try (Connection c = com.confia.support.StaffRoleFixtures.ownerTransaction(w.institution())) {
+            try (PreparedStatement context = c.prepareStatement("select set_config('app.actor_id', ?, true)")) {
+                context.setString(1, actor.toString());
+                context.execute();
+            }
+            try (PreparedStatement s = c.prepareStatement(sql)) {
+                for (int i = 0; i < parameters.length; i++) {
+                    s.setObject(i + 1, parameters[i]);
+                }
+                s.executeUpdate();
+            }
+            c.commit();
+        }
+    }
+
     private static void execAsOwner(World w, String sql, Object... parameters) throws SQLException {
         try (Connection c = com.confia.support.StaffRoleFixtures.ownerTransaction(w.institution());
                 PreparedStatement s = c.prepareStatement(sql)) {
@@ -337,8 +366,8 @@ class DiscountsIT extends ScholarshipsFixture {
     void theDatabaseRefusesABenefitThatIsNotExactlyOneOfTheTwoAndAWindowOutOfRange() throws SQLException {
         World w = world();
         String insert = "insert into scholarships_discount (institution_id, id, code, name, kind, benefit_type, percent, "
-                + "fixed_amount, valid_from, valid_to, is_stackable, created_by) values (?, ?, ?, 'N', 'campaign', ?, ?, ?, "
-                + "?::date, ?::date, true, ?)";
+                + "fixed_amount, valid_from, valid_to, is_stackable, created_by, approval_status) values (?, ?, ?, 'N', 'campaign', "
+                + "?, ?, ?, ?::date, ?::date, true, ?, 'pending')";
         UUID by = UUID.randomUUID();
 
         assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), "D1", "PERCENTAGE", 0, null,
@@ -360,7 +389,7 @@ class DiscountsIT extends ScholarshipsFixture {
     @Test
     void aDiscountIsDeactivatedAndReactivatedAndNeverDeleted() throws SQLException {
         World w = world();
-        DiscountView created = campaign(w, "CAMP-10", "10");
+        DiscountView created = agreement(w, "CONV-10", "10");
 
         DiscountView inactive = manageDiscounts().deactivate(w.administrator(), request(), created.id());
         DiscountView again = manageDiscounts().deactivate(w.administrator(), request(), created.id());
@@ -461,16 +490,18 @@ class DiscountsIT extends ScholarshipsFixture {
         DiscountView campaign = campaign(w, "CAMP-10", "10");
         DiscountView agreement = agreement(w, "CONV-10", "10");
         String insert = "insert into scholarships_discount_assignment (institution_id, id, discount_id, student_id, valid_from, "
-                + "valid_to, requested_by) values (?, ?, ?, ?, ?::date, ?::date, ?)";
+                + "valid_to, requested_by, discount_version, benefit_type, percent) values (?, ?, ?, ?, ?::date, ?::date, ?, 0, "
+                + "'PERCENTAGE', 10)";
+        UUID requester = UUID.randomUUID();
 
-        assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), campaign.id(), w.student(0),
-                "2027-02-01", "2027-06-30", UUID.randomUUID())).isInstanceOf(SQLException.class)
+        assertThatThrownBy(() -> execAsActor(w, requester, insert, w.institution(), UUID.randomUUID(), campaign.id(), w.student(0),
+                "2027-02-01", "2027-06-30", requester)).isInstanceOf(SQLException.class)
                 .hasMessageContaining("only an agreement discount");
-        assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), agreement.id(), w.student(0),
-                "2026-12-31", "2027-06-30", UUID.randomUUID())).isInstanceOf(SQLException.class)
+        assertThatThrownBy(() -> execAsActor(w, requester, insert, w.institution(), UUID.randomUUID(), agreement.id(), w.student(0),
+                "2026-12-31", "2027-06-30", requester)).isInstanceOf(SQLException.class)
                 .hasMessageContaining("inside the one of its discount");
-        assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), agreement.id(), w.student(0),
-                "2027-02-01", "2028-01-01", UUID.randomUUID())).isInstanceOf(SQLException.class)
+        assertThatThrownBy(() -> execAsActor(w, requester, insert, w.institution(), UUID.randomUUID(), agreement.id(), w.student(0),
+                "2027-02-01", "2028-01-01", requester)).isInstanceOf(SQLException.class)
                 .hasMessageContaining("inside the one of its discount");
     }
 
@@ -884,5 +915,226 @@ class DiscountsIT extends ScholarshipsFixture {
         assertThatThrownBy(() -> execAsOwner(w, "update scholarships_discount_assignment_decision set reason = 'x' "
                 + "where institution_id = ?", w.institution())).isInstanceOf(SQLException.class)
                 .hasMessageContaining("append-only");
+    }
+
+    // --- H2: the approval is bound to the terms the assignment was requested for ---
+
+    @Test
+    void theAssignmentKeepsTheVersionAndTheBenefitOfTheDiscountItWasRequestedForAndTheAuditCarriesThem() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+
+        AssignmentView requested = requested(w, discount, 0, FEB, JUN);
+        AssignmentView approved = approved(w, requested);
+
+        assertThat(requested.discountVersion()).isEqualTo(discount.version());
+        assertThat(requested.benefitType()).isEqualTo("PERCENTAGE");
+        assertThat(requested.percent()).isEqualTo("10.00");
+        assertThat(requested.fixedAmount()).isNull();
+        assertThat(approved.discountVersion()).isEqualTo(discount.version());
+        assertThat(viewAssignments().get(w.cashier(), request(), requested.id()).percent()).isEqualTo("10.00");
+        assertThat(scalar(w.institution(), "select count(*) from shared_audit_log where institution_id = ? and action in "
+                + "('scholarships.discount_assignment.requested', 'scholarships.discount_assignment.approved') "
+                + "and after_value->>'discountVersion' = '0' and after_value->>'benefitType' = 'PERCENTAGE' "
+                + "and (after_value->>'percent')::numeric = 10", w.institution())).isEqualTo(2);
+    }
+
+    @Test
+    void aFixedAmountAssignmentKeepsItsAmountToo() throws SQLException {
+        World w = world();
+        DiscountView discount = manageDiscounts().create(w.administrator(), request(), "FIJO-100", "agreement",
+                new ManageDiscounts.Draft("Fijo", "FIXED_AMOUNT", null, "100.00", FROM, TO, true, Set.of(w.env().concept())));
+
+        AssignmentView requested = requested(w, discount, 0, FEB, JUN);
+
+        assertThat(requested.benefitType()).isEqualTo("FIXED_AMOUNT");
+        assertThat(requested.percent()).isNull();
+        assertThat(requested.fixedAmount().amount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void anApprovalIsRefusedWhenTheDiscountChangedAfterTheRequestWhateverWasChangedAndNothingIsWritten() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+        AssignmentView raised = requested(w, discount, 0, FEB, JUN);
+        // The one who requested it raises the benefit before anybody approves (an agreement discount is edited at once).
+        DiscountView edited = manageDiscounts().update(w.coordinator(), request(), discount.id(), 0, draft(w, "90", true));
+
+        assertThatThrownBy(() -> decideAssignment().approve(w.administrator(), request(), "approve-raised", raised.id()))
+                .isInstanceOf(DiscountTermsChangedException.class);
+        // Even an edit that changes no term (the name) moves the version: the approver approves what was shown or nothing.
+        AssignmentView renamed = requested(w, edited, 1, FEB, JUN);
+        manageDiscounts().update(w.coordinator(), request(), edited.id(), edited.version(), new ManageDiscounts.Draft("Otro nombre",
+                "PERCENTAGE", "90", null, FROM, TO, true, Set.of(w.env().concept())));
+        assertThatThrownBy(() -> decideAssignment().approve(w.administrator(), request(), "approve-renamed", renamed.id()))
+                .isInstanceOf(DiscountTermsChangedException.class);
+
+        assertThat(viewAssignments().get(w.administrator(), request(), raised.id()).status()).isEqualTo("pending");
+        assertThat(scalar(w.institution(), "select count(*) from scholarships_discount_assignment_decision where institution_id = ?",
+                w.institution())).isZero();
+        assertThat(auditEntries(w, "scholarships.discount_assignment.approved")).isZero();
+        // Rejecting needs no terms: whoever decides may still refuse it, and a new request for the terms of today is approved.
+        assertThat(decideAssignment().reject(w.administrator(), request(), "reject-raised", raised.id(), REASON).status())
+                .isEqualTo("rejected");
+        DiscountView current = manageDiscounts().get(w.administrator(), request(), discount.id());
+        assertThat(approved(w, requested(w, current, 0, FEB, JUN)).status()).isEqualTo("approved");
+    }
+
+    @Test
+    void theDatabaseItselfRefusesToApproveAnAssignmentForOtherTermsThanTheOnesItWasRequestedFor() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+        AssignmentView requested = requested(w, discount, 0, FEB, JUN);
+        manageDiscounts().update(w.coordinator(), request(), discount.id(), 0, draft(w, "90", true));
+
+        assertThatThrownBy(() -> execAsActor(w, w.administrator().accountId(),
+                "update scholarships_discount_assignment set status = 'approved' where institution_id = ? and id = ?",
+                w.institution(), requested.id())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("terms it was requested for");
+        assertThat(viewAssignments().get(w.administrator(), request(), requested.id()).status()).isEqualTo("pending");
+    }
+
+    @Test
+    void anAssignmentIsBornOnlyWithTheTermsTheDiscountHasNowAndTheyNeverChange() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+        AssignmentView requested = requested(w, discount, 0, FEB, JUN);
+        UUID requester = w.coordinator().accountId();
+        String insert = "insert into scholarships_discount_assignment (institution_id, id, discount_id, student_id, valid_from, "
+                + "valid_to, requested_by, discount_version, benefit_type, percent) values (?, ?, ?, ?, ?::date, ?::date, ?, ?, ?, ?)";
+
+        assertThatThrownBy(() -> execAsActor(w, requester, insert, w.institution(), UUID.randomUUID(), discount.id(), w.student(1),
+                "2027-02-01", "2027-06-30", requester, 5, "PERCENTAGE", 10)).isInstanceOf(SQLException.class)
+                .hasMessageContaining("terms the discount has now");
+        assertThatThrownBy(() -> execAsActor(w, requester, insert, w.institution(), UUID.randomUUID(), discount.id(), w.student(1),
+                "2027-02-01", "2027-06-30", requester, 0, "PERCENTAGE", 50)).isInstanceOf(SQLException.class)
+                .hasMessageContaining("terms the discount has now");
+        assertThatThrownBy(() -> execAsActor(w, requester, "update scholarships_discount_assignment set percent = 99 "
+                + "where institution_id = ? and id = ?", w.institution(), requested.id())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("changes only its status");
+    }
+
+    @Test
+    void anAssignmentFromBeforeTheTermsWereKeptIsNeverApprovedByTheApplicationNorTheDatabase() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+        UUID legacy = UUID.randomUUID();
+        // The shape V39 gave it: no snapshot. Only the superuser with the triggers off can write one now (as the migrations of that time did).
+        try (Connection c = com.confia.support.SharedPostgresContainer.connectionAs("postgres");
+                java.sql.Statement replica = c.createStatement()) {
+            replica.execute("set session_replication_role = replica");
+            try (PreparedStatement insert = c.prepareStatement("insert into scholarships_discount_assignment (institution_id, id, "
+                    + "discount_id, student_id, valid_from, valid_to, requested_by) values (?, ?, ?, ?, date '2027-02-01', "
+                    + "date '2027-06-30', ?)")) {
+                insert.setObject(1, w.institution());
+                insert.setObject(2, legacy);
+                insert.setObject(3, discount.id());
+                insert.setObject(4, w.student(0));
+                insert.setObject(5, w.coordinator().accountId());
+                insert.executeUpdate();
+            }
+        }
+
+        assertThatThrownBy(() -> decideAssignment().approve(w.administrator(), request(), "approve-legacy", legacy))
+                .isInstanceOf(DiscountTermsChangedException.class);
+        assertThatThrownBy(() -> execAsActor(w, w.administrator().accountId(),
+                "update scholarships_discount_assignment set status = 'approved' where institution_id = ? and id = ?",
+                w.institution(), legacy)).isInstanceOf(SQLException.class).hasMessageContaining("terms it was requested for");
+        assertThat(viewAssignments().get(w.administrator(), request(), legacy).discountVersion()).isNull();
+    }
+
+    // --- L1: the requester is the account of the session ---
+
+    @Test
+    void theDatabaseRefusesAnAssignmentRequestedInTheNameOfAnotherAccountOrOfNobody() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+        String insert = "insert into scholarships_discount_assignment (institution_id, id, discount_id, student_id, valid_from, "
+                + "valid_to, requested_by, discount_version, benefit_type, percent) values (?, ?, ?, ?, ?::date, ?::date, ?, 0, "
+                + "'PERCENTAGE', 10)";
+
+        // The session is the coordinator's and the row names the administrator: nobody requests in the name of another.
+        assertThatThrownBy(() -> execAsActor(w, w.coordinator().accountId(), insert, w.institution(), UUID.randomUUID(),
+                discount.id(), w.student(0), "2027-02-01", "2027-06-30", w.administrator().accountId()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("requested by the person of the session");
+        // No session account at all.
+        assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), discount.id(), w.student(0),
+                "2027-02-01", "2027-06-30", w.administrator().accountId())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("requested by the person of the session");
+        execAsActor(w, w.coordinator().accountId(), insert, w.institution(), UUID.randomUUID(), discount.id(), w.student(0),
+                "2027-02-01", "2027-06-30", w.coordinator().accountId());
+    }
+
+    // --- S8 in the database: the stackable flag of a discount in use is locked ---
+
+    @Test
+    void theDatabaseItselfRefusesToChangeTheStackableFlagOfADiscountInUse() throws SQLException {
+        World w = world();
+        DiscountView created = agreement(w, "CONV-10", "10");
+        assertThat(created.stackable()).isTrue();
+        // Not in use yet: it moves.
+        execAsOwner(w, "update scholarships_discount set is_stackable = false, version = version + 1 where institution_id = ? "
+                + "and id = ?", w.institution(), created.id());
+        execAsOwner(w, "update scholarships_discount set is_stackable = true, version = version + 1 where institution_id = ? "
+                + "and id = ?", w.institution(), created.id());
+        approved(w, requested(w, manageDiscounts().get(w.administrator(), request(), created.id()), 0, FEB, JUN));
+
+        assertThatThrownBy(() -> execAsOwner(w, "update scholarships_discount set is_stackable = false "
+                + "where institution_id = ? and id = ?", w.institution(), created.id())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("stackable flag of a discount in use never changes");
+    }
+
+    // --- L3: isolation of the view of the discounts in use and of a session without an institution ---
+
+    @Test
+    void theViewOfTheDiscountsInUseShowsOneInstitutionOnlyItsOwnAndNothingWithoutAnInstitution() throws SQLException {
+        World mine = world();
+        World theirs = world();
+        approved(mine, requested(mine, agreement(mine, "CONV-10", "10"), 0, FEB, JUN));
+
+        // There is one discount in use, so a count of zero is the work of the row-level security under the view and not an empty one.
+        assertThat(countVisibleAsApplication(mine.institution(), "scholarships_discount_in_use")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(theirs.institution(), "scholarships_discount_in_use")).isZero();
+        assertThat(countWithSetting(null, "scholarships_discount_in_use")).isZero();
+        assertThat(countWithSetting("", "scholarships_discount_in_use")).isZero();
+    }
+
+    @Test
+    void aSessionWithoutAnInstitutionSeesNothingOfTheDiscountTablesWhetherTheSettingIsMissingOrEmpty() throws SQLException {
+        World w = world();
+        approved(w, requested(w, agreement(w, "CONV-10", "10"), 0, FEB, JUN));
+
+        for (String table : List.of("scholarships_discount", "scholarships_discount_concept", "scholarships_discount_assignment",
+                "scholarships_discount_assignment_decision", "scholarships_discount_change_decision")) {
+            assertThat(countWithSetting(null, table)).as(table + " with the setting never made").isZero();
+            assertThat(countWithSetting("", table)).as(table + " with an empty setting").isZero();
+        }
+        assertThat(countVisibleAsApplication(w.institution(), "scholarships_discount")).as("the rows exist").isEqualTo(1);
+        // Nor can such a session write.
+        assertThatThrownBy(() -> asApplication("", "insert into scholarships_discount_change_decision (institution_id, id, "
+                + "discount_id, discount_version, decision, decided_by, request_key, request_hash) values (?, ?, ?, 0, 'approved', "
+                + "?, 'k', ?)", w.institution(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "a".repeat(64)))
+                .isInstanceOf(SQLException.class);
+    }
+
+    /** One statement as the application role with the setting of the institution as given (never made when {@code null}). */
+    private static int asApplication(String setting, String sql, Object... parameters) throws SQLException {
+        try (Connection c = com.confia.support.SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            c.setAutoCommit(false);
+            if (setting != null) {
+                try (PreparedStatement context = c.prepareStatement("select set_config('app.institution_id', ?, true)")) {
+                    context.setString(1, setting);
+                    context.execute();
+                }
+            }
+            try (PreparedStatement s = c.prepareStatement(sql)) {
+                for (int i = 0; i < parameters.length; i++) {
+                    s.setObject(i + 1, parameters[i]);
+                }
+                int changed = s.executeUpdate();
+                c.rollback();
+                return changed;
+            }
+        }
     }
 }

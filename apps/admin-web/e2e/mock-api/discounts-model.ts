@@ -1,5 +1,7 @@
 import {
+  ApproveDiscountChangeBody,
   CreateDiscountRequest,
+  RejectDiscountChangeBody,
   RejectDiscountAssignmentBody,
   RequestDiscountAssignmentRequest,
   RevokeDiscountAssignmentBody,
@@ -18,7 +20,11 @@ import { studentId, type StudentRow } from "./students-seed.ts";
  * another person decides it (403 `self-approval-forbidden` for the one who requested it), a decision needs an `Idempotency-Key` (the same key and body
  * answer the same assignment), the reason of a rejection or a revocation is 20 to 500 characters, a pending assignment is approved or rejected and an
  * approved one revoked (409 `invalid-discount-assignment-state` otherwise), and a discount with an approved or revoked assignment is in use, which locks
- * its type and value (409 `discount-benefit-locked`) and lets its scope only shrink (409 `discount-scope-locked`). The simulator of charges in this
+ * its type, value and stackable mark (409 `discount-benefit-locked`) and lets its scope only shrink (409 `discount-scope-locked`). A campaign discount is born
+ * pending and another person approves or rejects it with the version they saw (`POST .../approve|reject`, 403 `self-approval-forbidden` for the one who
+ * created it or proposed the change, 409 `invalid-discount-change-state` when nothing waits); widening one or reactivating it leaves a proposal that
+ * changes nothing until then, and a discount that waits cannot be edited or reactivated (409 `discount-pending-approval`). An assignment keeps the
+ * version and the benefit of its discount at the request, and approving it after the discount changed is refused (409 `discount-terms-changed`). The simulator of charges in this
  * simulated API does not apply discounts; the real rules, and their limits, are tested in the backend.
  */
 export const DISCOUNTS_BASE = "/api/v1/scholarships/discounts";
@@ -41,6 +47,20 @@ interface Money {
   currency: string;
 }
 
+interface ProposalRow {
+  name: string;
+  benefitType: "PERCENTAGE" | "FIXED_AMOUNT";
+  percent: string | null;
+  fixedAmount: Money | null;
+  validFrom: string;
+  validTo: string;
+  stackable: boolean;
+  conceptIds: string[];
+  reactivate: boolean;
+  requestedBy: string;
+  requestedAt: string;
+}
+
 interface DiscountRow {
   id: string;
   code: string;
@@ -54,6 +74,11 @@ interface DiscountRow {
   stackable: boolean;
   conceptIds: string[];
   active: boolean;
+  approvalStatus: "pending" | "approved" | "rejected";
+  createdBy: string;
+  pending: ProposalRow | null;
+  /** The key of the last decision and what it sent, so the same request is answered the same. */
+  keys: Map<string, string>;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -76,6 +101,11 @@ interface AssignmentRow {
   status: "pending" | "approved" | "rejected" | "revoked";
   requestedAt: string;
   requestedBy: string;
+  /** The version and the benefit of the discount when it was requested: the approval is bound to them. */
+  discountVersion: number;
+  benefitType: "PERCENTAGE" | "FIXED_AMOUNT";
+  percent: string | null;
+  fixedAmount: Money | null;
   decision: DecisionRow | null;
   revocation: DecisionRow | null;
   /** The key of the last decision and what it sent, so the same request is answered the same. */
@@ -83,7 +113,10 @@ interface AssignmentRow {
 }
 
 export interface DiscountsOptions {
-  /** `seeded`: a campaign and an agreement discount and three assignments (a pending one another person requested, one the person requested, and an approved one). `none`: nothing. */
+  /**
+   * `seeded`: an approved campaign discount, a campaign discount that another person created and waits for approval, an agreement discount and three
+   * assignments (a pending one another person requested, one the person requested, and an approved one). `none`: nothing.
+   */
   readonly seed: "none" | "seeded";
   /** `failing-first`: the first reads answer 500, then they recover. */
   readonly reads: "ok" | "failing-first";
@@ -140,7 +173,16 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
   let sequence = 100;
 
   const concepts = () => context.concepts();
-  const discountRow = (n: number, code: string, name: string, kind: DiscountRow["kind"], percent: string, stackable: boolean, conceptIds: string[]): DiscountRow => ({
+  const discountRow = (
+    n: number,
+    code: string,
+    name: string,
+    kind: DiscountRow["kind"],
+    percent: string,
+    stackable: boolean,
+    conceptIds: string[],
+    approvalStatus: DiscountRow["approvalStatus"] = "approved",
+  ): DiscountRow => ({
     id: discountRowId(n),
     code,
     name,
@@ -153,6 +195,10 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     stackable,
     conceptIds,
     active: true,
+    approvalStatus,
+    createdBy: OTHER,
+    pending: null,
+    keys: new Map(),
     version: 0,
     createdAt: STAMP,
     updatedAt: STAMP,
@@ -166,6 +212,10 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     status,
     requestedAt: `2026-11-0${String(n)}T15:00:00Z`,
     requestedBy,
+    discountVersion: 0,
+    benefitType: "PERCENTAGE",
+    percent: "20.00",
+    fixedAmount: null,
     decision,
     revocation: null,
     keys: new Map(),
@@ -176,6 +226,7 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     discounts.push(
       discountRow(1, "CAMP10", "Campaña de matrícula", "campaign", "10.00", true, [tuition]),
       discountRow(2, "CONV20", "Convenio con la empresa", "agreement", "20.00", false, [tuition]),
+      discountRow(3, "CAMP15", "Campaña de verano", "campaign", "15.00", true, [tuition], "pending"),
     );
     assignments.push(
       assignmentRow(1, 1, 2, "pending", OTHER),
@@ -190,6 +241,7 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     return reads <= FAILING_READS ? failure("internal-error", 500, { traceId: TRACE_ID }) : undefined;
   }
 
+  const waiting = (discount: DiscountRow): boolean => discount.approvalStatus !== "approved" || discount.pending !== null;
   const inUse = (discount: DiscountRow): boolean => assignments.some((candidate) => candidate.discountId === discount.id && (candidate.status === "approved" || candidate.status === "revoked"));
   const conceptsOf = (ids: readonly string[]) =>
     ids.flatMap((id) => {
@@ -211,6 +263,25 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     concepts: conceptsOf(discount.conceptIds),
     active: discount.active,
     inUse: inUse(discount),
+    approvalStatus: discount.approvalStatus,
+    createdBy: discount.createdBy,
+    ...(discount.pending === null
+      ? {}
+      : {
+          pendingChange: {
+            name: discount.pending.name,
+            benefitType: discount.pending.benefitType,
+            percent: discount.pending.percent,
+            ...(discount.pending.fixedAmount === null ? {} : { fixedAmount: discount.pending.fixedAmount }),
+            validFrom: discount.pending.validFrom,
+            validTo: discount.pending.validTo,
+            stackable: discount.pending.stackable,
+            reactivate: discount.pending.reactivate,
+            concepts: conceptsOf(discount.pending.conceptIds),
+            requestedBy: discount.pending.requestedBy,
+            requestedAt: discount.pending.requestedAt,
+          },
+        }),
     version: discount.version,
     createdAt: discount.createdAt,
     updatedAt: discount.updatedAt,
@@ -234,6 +305,10 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
       discountId: assignment.discountId,
       discountCode: discount?.code ?? null,
       discountName: discount?.name ?? null,
+      discountVersion: assignment.discountVersion,
+      benefitType: assignment.benefitType,
+      percent: assignment.percent,
+      ...(assignment.fixedAmount === null ? {} : { fixedAmount: assignment.fixedAmount }),
       validFrom: assignment.validFrom,
       validTo: assignment.validTo,
       status: assignment.status,
@@ -289,6 +364,11 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
       stackable: input.stackable,
       conceptIds: input.conceptIds,
       active: true,
+      // A campaign discount applies to nothing until another person approves it; an agreement one is always approved.
+      approvalStatus: input.kind === "campaign" ? "pending" : "approved",
+      createdBy: ME,
+      pending: null,
+      keys: new Map(),
       version: 0,
       createdAt: context.now().toISOString(),
       updatedAt: context.now().toISOString(),
@@ -302,13 +382,14 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     if (!parsed.success) return schemaErrors(parsed.error.issues);
     const input = parsed.data;
     if (input.version !== discount.version) return failure("stale-version", 409);
+    if (waiting(discount)) return failure("discount-pending-approval", 409);
     if (input.validTo < input.validFrom) return invalid([{ field: "validTo", reason: "validity-order" }]);
     const coverage = validCoverage(input.conceptIds);
     if (coverage !== undefined) return coverage;
     if (inUse(discount)) {
       const benefit = input.benefitType === "PERCENTAGE" ? (input.percent ?? null) : (input.fixedAmount?.amount ?? null);
       const held = discount.benefitType === "PERCENTAGE" ? discount.percent : (discount.fixedAmount?.amount ?? null);
-      if (input.benefitType !== discount.benefitType || benefit !== held) return failure("discount-benefit-locked", 409);
+      if (input.benefitType !== discount.benefitType || benefit !== held || input.stackable !== discount.stackable) return failure("discount-benefit-locked", 409);
       const widens = input.validFrom < discount.validFrom || input.validTo > discount.validTo || input.conceptIds.some((id) => !discount.conceptIds.includes(id));
       if (widens) return failure("discount-scope-locked", 409);
     }
@@ -319,6 +400,32 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
         (candidate.validFrom < input.validFrom || candidate.validTo > input.validTo),
     );
     if (outside) return invalid([{ field: "validTo", reason: "assignments-outside-validity" }]);
+    const widensCampaign =
+      discount.kind === "campaign" &&
+      (input.benefitType !== discount.benefitType ||
+        (input.benefitType === "PERCENTAGE" ? Number(input.percent ?? 0) > Number(discount.percent ?? 0) : Number(input.fixedAmount?.amount ?? 0) > Number(discount.fixedAmount?.amount ?? 0)) ||
+        input.validFrom < discount.validFrom ||
+        input.validTo > discount.validTo ||
+        input.conceptIds.some((id) => !discount.conceptIds.includes(id)) ||
+        (input.stackable && !discount.stackable));
+    if (widensCampaign) {
+      // A widening is only a proposal: the terms in force do not change until another person approves it.
+      discount.pending = {
+        name: input.name,
+        benefitType: input.benefitType,
+        percent: input.benefitType === "PERCENTAGE" ? (input.percent ?? null) : null,
+        fixedAmount: input.benefitType === "FIXED_AMOUNT" ? (input.fixedAmount ?? null) : null,
+        validFrom: input.validFrom,
+        validTo: input.validTo,
+        stackable: input.stackable,
+        conceptIds: input.conceptIds,
+        reactivate: false,
+        requestedBy: ME,
+        requestedAt: context.now().toISOString(),
+      };
+      Object.assign(discount, { version: discount.version + 1, updatedAt: context.now().toISOString() });
+      return wrap(discountRecord(discountBody(discount)));
+    }
     Object.assign(discount, {
       name: input.name,
       benefitType: input.benefitType,
@@ -335,7 +442,67 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
   }
 
   function setActive(discount: DiscountRow, active: boolean): ModelResponse {
+    if (active && waiting(discount)) return failure("discount-pending-approval", 409);
+    if (active && !discount.active && discount.kind === "campaign") {
+      // Reactivating a campaign discount is only a proposal: it stays off until another person approves it.
+      discount.pending = {
+        name: discount.name,
+        benefitType: discount.benefitType,
+        percent: discount.percent,
+        fixedAmount: discount.fixedAmount,
+        validFrom: discount.validFrom,
+        validTo: discount.validTo,
+        stackable: discount.stackable,
+        conceptIds: discount.conceptIds,
+        reactivate: true,
+        requestedBy: ME,
+        requestedAt: context.now().toISOString(),
+      };
+      Object.assign(discount, { version: discount.version + 1, updatedAt: context.now().toISOString() });
+      return wrap(discountRecord(discountBody(discount)));
+    }
     if (discount.active !== active) Object.assign(discount, { active, version: discount.version + 1, updatedAt: context.now().toISOString() });
+    return wrap(discountRecord(discountBody(discount)));
+  }
+
+  function decideDiscount(discount: DiscountRow, kind: "approve" | "reject", body: unknown, key: string | undefined): ModelResponse {
+    if (key === undefined || key.trim() === "") return failure("idempotency-key-missing", 400);
+    const fingerprint = JSON.stringify([kind, body ?? null]);
+    const known = discount.keys.get(key);
+    if (known !== undefined) return known === fingerprint ? wrap(discountRecord(discountBody(discount))) : failure("idempotency-payload-mismatch", 422);
+    const parsed = ApproveDiscountChangeBody.safeParse(body);
+    if (!parsed.success) return invalid([{ field: "version", reason: "invalid" }]);
+    if (kind === "reject") {
+      const rejected = RejectDiscountChangeBody.safeParse(body);
+      if (!rejected.success) return invalid([{ field: "reason", reason: "invalid" }]);
+      const reason = rejected.data.reason.trim();
+      if (Array.from(reason).length < REASON_MIN || Array.from(reason).length > REASON_MAX) return invalid([{ field: "reason", reason: "size" }]);
+    }
+    if (parsed.data.version !== discount.version) return failure("stale-version", 409);
+    const proposal = discount.pending;
+    const creation = discount.approvalStatus === "pending";
+    if (!creation && proposal === null) return failure("invalid-discount-change-state", 409);
+    if ((creation ? discount.createdBy : proposal?.requestedBy) === ME) return failure("self-approval-forbidden", 403);
+    if (kind === "approve") {
+      if (creation) Object.assign(discount, { approvalStatus: "approved" });
+      else if (proposal !== null) {
+        Object.assign(discount, {
+          name: proposal.name,
+          benefitType: proposal.benefitType,
+          percent: proposal.percent,
+          fixedAmount: proposal.fixedAmount,
+          validFrom: proposal.validFrom,
+          validTo: proposal.validTo,
+          stackable: proposal.stackable,
+          conceptIds: proposal.conceptIds,
+          active: proposal.reactivate ? true : discount.active,
+          pending: null,
+        });
+      }
+    } else if (creation) Object.assign(discount, { approvalStatus: "rejected", active: false });
+    else Object.assign(discount, { pending: null });
+    Object.assign(discount, { version: discount.version + 1, updatedAt: context.now().toISOString() });
+    discount.keys.set(key, fingerprint);
     return wrap(discountRecord(discountBody(discount)));
   }
 
@@ -380,6 +547,10 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
       status: "pending",
       requestedAt: context.now().toISOString(),
       requestedBy: ME,
+      discountVersion: discount.version,
+      benefitType: discount.benefitType,
+      percent: discount.percent,
+      fixedAmount: discount.fixedAmount,
       decision: null,
       revocation: null,
       keys: new Map(),
@@ -402,6 +573,10 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
     }
     if (kind !== "revoke" && assignment.requestedBy === ME) return failure("self-approval-forbidden", 403);
     if (kind === "revoke" ? assignment.status !== "approved" : assignment.status !== "pending") return failure("invalid-discount-assignment-state", 409);
+    if (kind === "approve") {
+      const discount = discounts.find((candidate) => candidate.id === assignment.discountId);
+      if (discount !== undefined && discount.version !== assignment.discountVersion) return failure("discount-terms-changed", 409);
+    }
     const decision: DecisionRow = {
       id: decisionId(100 + ++sequence),
       kind: kind === "approve" ? "approved" : kind === "reject" ? "rejected" : "revoked",
@@ -425,7 +600,7 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
         if (method === "GET") return listAssignments(query);
         return method === "POST" ? requestAssignment(body) : undefined;
       }
-      const onDiscount = /^\/api\/v1\/scholarships\/discounts\/([^/]+)(?:\/(deactivate|reactivate))?$/.exec(path);
+      const onDiscount = /^\/api\/v1\/scholarships\/discounts\/([^/]+)(?:\/(deactivate|reactivate|approve|reject))?$/.exec(path);
       if (onDiscount !== null) {
         const found = discounts.find((candidate) => candidate.id === onDiscount[1]);
         if (found === undefined) return failure("resource-not-found", 404);
@@ -434,7 +609,9 @@ export function createDiscountsModel(options: DiscountsOptions, context: Discoun
           if (method === "GET") return wrap(discountRecord(discountBody(found)));
           return method === "PUT" ? updateDiscount(found, body) : undefined;
         }
-        return method === "POST" ? setActive(found, action === "reactivate") : undefined;
+        if (method !== "POST") return undefined;
+        if (action === "approve" || action === "reject") return decideDiscount(found, action, body, headers?.["idempotency-key"]);
+        return setActive(found, action === "reactivate");
       }
       const onAssignment = /^\/api\/v1\/scholarships\/discount-assignments\/([^/]+)(?:\/(approve|reject|revoke))?$/.exec(path);
       if (onAssignment === null) return undefined;

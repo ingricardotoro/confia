@@ -125,10 +125,13 @@
     "invalidAwardState": "El otorgamiento ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual.",
     "scholarshipScopeLocked": "Esta beca ya tiene otorgamientos aprobados: el tope solo puede bajar y los conceptos solo pueden quitarse. Para ampliar la beca, cree otra.",
     "duplicateDiscountCode": "Ya existe un descuento con ese código.",
-    "discountBenefitLocked": "Este descuento ya está en uso (tiene asignaciones aprobadas o cargos emitidos), por lo que su tipo y su valor no se pueden cambiar. Cree otro descuento con el nuevo valor y los cargos ya emitidos seguirán explicándose con el descuento que tenían.",
+    "discountBenefitLocked": "Este descuento ya está en uso (tiene asignaciones aprobadas o cargos emitidos), por lo que su tipo, su valor y su marca de acumulable no se pueden cambiar. Cree otro descuento con el nuevo valor y los cargos ya emitidos seguirán explicándose con el descuento que tenían.",
     "discountScopeLocked": "Este descuento ya está en uso: la vigencia solo puede acortarse y los conceptos solo pueden quitarse. Para ampliarlo, cree otro descuento.",
     "discountAssignmentOverlap": "El estudiante ya tiene aprobada una asignación de este descuento con fechas que se cruzan con las de esta. Ajuste la vigencia o revoque la asignación anterior.",
-    "invalidDiscountAssignmentState": "La asignación ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual."
+    "invalidDiscountAssignmentState": "La asignación ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual.",
+    "discountPendingApproval": "Este descuento espera la aprobación de otra persona (su creación o una propuesta sobre él), por lo que no se puede editar ni reactivar. Se puede desactivar. Cuando otra persona con permiso de aprobación lo decida, podrá editarlo.",
+    "invalidDiscountChangeState": "El descuento ya no tiene pendiente lo que se mostraba, por lo que no admite esta decisión. Los datos ya se recargaron: revise su estado actual.",
+    "discountTermsChanged": "Los términos del descuento cambiaron después de solicitar esta asignación, por lo que no se puede aprobar. Rechácela y solicite la asignación otra vez con los términos actuales."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -2308,7 +2311,8 @@
       "selfApproval": "Quien solicitó el otorgamiento no puede aprobarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise.",
       "duplicateDiscountCode": "Ya existe un descuento con ese código.",
       "assignmentsOutsideValidity": "Hay asignaciones pendientes o aprobadas que quedarían fuera de esta vigencia. Para acortarla, primero revóquelas o recházelas.",
-      "assignmentSelfApproval": "Quien solicitó la asignación no puede aprobarla ni rechazarla. Pida a otra persona con permiso de aprobación que la revise."
+      "assignmentSelfApproval": "Quien solicitó la asignación no puede aprobarla ni rechazarla. Pida a otra persona con permiso de aprobación que la revise.",
+      "discountSelfApproval": "Quien creó el descuento o propuso el cambio no puede aprobarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise."
     },
     "statuses": {
       "pending": "Pendiente de aprobación",
@@ -2539,17 +2543,71 @@
         "stackable": "Acumulación",
         "concepts": "Conceptos que cubre"
       },
+      "approval": {
+        "approved": "Aprobado",
+        "pending": "Pendiente de aprobación",
+        "proposal": "Propuesta pendiente",
+        "rejected": "Rechazado"
+      },
+      "proposal": {
+        "summary": "Propone:",
+        "reactivate": "Reactivar el descuento",
+        "pendingNote": "Aún no se aplica a ningún cargo. Otra persona con permiso de aprobación debe aprobarlo.",
+        "proposalNote": "Los términos vigentes siguen aplicándose hasta que otra persona apruebe la propuesta.",
+        "rejectedNote": "Fue rechazado y no se aplica. Para otro valor o alcance, cree un descuento nuevo."
+      },
+      "terms": {
+        "name": "Nombre",
+        "benefit": "Beneficio",
+        "validity": "Vigencia",
+        "stackable": "Acumulación",
+        "concepts": "Conceptos que cubre",
+        "reactivate": "Al aprobar"
+      },
+      "notices": {
+        "createdPending": "Se creó «{name}». Queda pendiente de aprobación y no se aplica a ningún cargo hasta que otra persona con permiso de aprobación la decida.",
+        "proposalSent": "Se envió la propuesta sobre «{name}». Los términos vigentes siguen aplicándose hasta que otra persona la apruebe."
+      },
+      "approve": {
+        "button": "Aprobar",
+        "buttonFor": "Aprobar {name}",
+        "pendingTitle": "Aprobar el descuento",
+        "pendingDescription": "Desde la aprobación, el descuento se aplica a los cargos que se generen dentro de su vigencia. Los cargos ya emitidos no cambian. La decisión queda registrada.",
+        "proposalTitle": "Aprobar la propuesta",
+        "proposalDescription": "Desde la aprobación, los términos propuestos son los vigentes para los cargos que se generen desde entonces. Los cargos ya emitidos no cambian. La decisión queda registrada.",
+        "submit": "Aprobar",
+        "sending": "Aprobando.",
+        "approvedNotice": "«{name}» quedó aprobado. Se aplicará a los cargos que se generen dentro de su vigencia.",
+        "proposalApprovedNotice": "La propuesta sobre «{name}» quedó aprobada. Sus términos rigen para los cargos que se generen desde ahora."
+      },
+      "reject": {
+        "button": "Rechazar",
+        "buttonFor": "Rechazar {name}",
+        "pendingTitle": "Rechazar el descuento",
+        "pendingDescription": "Un descuento rechazado nunca se aplica ni se edita: para otro, cree uno nuevo. La decisión queda registrada y no se puede deshacer.",
+        "proposalTitle": "Rechazar la propuesta",
+        "proposalDescription": "Los términos vigentes siguen aplicándose y la propuesta se descarta. La decisión queda registrada y no se puede deshacer.",
+        "reason": "Motivo del rechazo",
+        "submit": "Rechazar",
+        "sending": "Rechazando.",
+        "rejectedNotice": "«{name}» quedó rechazado. Ningún cargo cambió.",
+        "proposalRejectedNotice": "La propuesta sobre «{name}» quedó rechazada. Los términos vigentes no cambiaron."
+      },
+      "currentTerms": "Términos vigentes · {code}",
+      "proposedTerms": "Términos propuestos",
+      "creationTerms": "Términos del descuento · {code}",
       "form": {
         "createTitle": "Crear un descuento",
         "createDescription": "Defina la clase, el beneficio, la vigencia y los conceptos que cubre. Se aplica a los cargos que se generen dentro de su vigencia.",
         "editTitle": "Editar el descuento",
-        "editDescription": "El código y la clase no cambian. Mientras el descuento esté en uso, su tipo y su valor no se pueden cambiar.",
+        "editDescription": "El código y la clase no cambian. Mientras el descuento esté en uso, su tipo, su valor y su marca de acumulable no se pueden cambiar.",
+        "campaignApprovalNote": "Un descuento de campaña nace pendiente y no se aplica a ningún cargo hasta que otra persona con permiso de aprobación lo apruebe. Ampliarlo después (otro tipo o un valor mayor, una vigencia o conceptos más amplios, acumulable activado) o reactivarlo deja una propuesta que también decide otra persona; mientras tanto siguen aplicándose los términos vigentes.",
         "code": "Código",
         "codeHelp": "Letras, números, guion y guion bajo, hasta 30 caracteres. No se puede cambiar después.",
         "name": "Nombre",
         "kind": "Clase",
         "kindHelp": "Un descuento de campaña se aplica solo a todo cargo de los conceptos que cubre. Uno de convenio solo se aplica a los estudiantes con una asignación aprobada.",
-        "inUse": "Este descuento ya está en uso (tiene asignaciones aprobadas o cargos emitidos): su tipo y su valor no se pueden cambiar, la vigencia solo puede acortarse y los conceptos solo pueden quitarse. Para otro valor o un alcance mayor, cree otro descuento.",
+        "inUse": "Este descuento ya está en uso (tiene asignaciones aprobadas o cargos emitidos): su tipo, su valor y su marca de acumulable no se pueden cambiar, la vigencia solo puede acortarse y los conceptos solo pueden quitarse. Para otro valor o un alcance mayor, cree otro descuento.",
         "validFrom": "Vigente desde",
         "validTo": "Vigente hasta",
         "validToHelp": "Este día cuenta como parte de la vigencia.",
@@ -2608,7 +2666,8 @@
         "approve": "Aprobar",
         "reject": "Rechazar",
         "revoke": "Revocar",
-        "pendingNote": "Esta asignación está pendiente de aprobación y todavía no cambia ningún cargo. La debe decidir una persona distinta de quien la solicitó.",
+        "pendingNote": "Esta asignación está pendiente de aprobación y todavía no cambia ningún cargo. La debe decidir una persona distinta de quien la solicitó, con los términos del descuento que se muestran: si el descuento cambió desde la solicitud, no se puede aprobar y se solicita otra vez.",
+        "noTermsNote": "Esta asignación se solicitó antes de que se guardaran los términos del descuento, por lo que no se puede aprobar. Rechácela y solicítela otra vez.",
         "revokedNote": "Esta asignación fue revocada. Solo afecta los cargos que se generen desde entonces: los ya emitidos no cambian.",
         "summaryHeading": "Resumen",
         "decisionHeading": "Decisión",
@@ -2617,6 +2676,8 @@
         "fields": {
           "student": "Estudiante",
           "discount": "Descuento",
+          "benefit": "Beneficio solicitado",
+          "discountVersion": "Versión del descuento",
           "validity": "Vigencia",
           "requestedAt": "Solicitada",
           "decision": "Decisión",

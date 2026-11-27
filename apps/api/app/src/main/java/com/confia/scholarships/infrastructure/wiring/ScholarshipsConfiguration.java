@@ -9,7 +9,9 @@ import com.confia.scholarships.application.AwardRepository;
 import com.confia.scholarships.application.AwardsInForceRepository;
 import com.confia.scholarships.application.DecideAward;
 import com.confia.scholarships.application.DecideDiscountAssignment;
+import com.confia.scholarships.application.DecideDiscountChange;
 import com.confia.scholarships.application.DiscountAssignmentRepository;
+import com.confia.scholarships.application.DiscountDecisionRepository;
 import com.confia.scholarships.application.DiscountBenefitsService;
 import com.confia.scholarships.application.DiscountRepository;
 import com.confia.scholarships.application.DiscountsInForceRepository;
@@ -27,6 +29,7 @@ import com.confia.scholarships.infrastructure.JooqAwardDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqAwardRepository;
 import com.confia.scholarships.infrastructure.JooqAwardsInForceRepository;
 import com.confia.scholarships.infrastructure.JooqDiscountAssignmentRepository;
+import com.confia.scholarships.infrastructure.JooqDiscountDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqDiscountRepository;
 import com.confia.scholarships.infrastructure.JooqDiscountsInForceRepository;
 import com.confia.scholarships.infrastructure.JooqScholarshipRepository;
@@ -116,6 +119,11 @@ public class ScholarshipsConfiguration {
     }
 
     @Bean
+    DiscountDecisionRepository discountDecisionRepository(DSLContext dsl) {
+        return new JooqDiscountDecisionRepository(dsl);
+    }
+
+    @Bean
     DiscountsInForceRepository discountsInForceRepository(DSLContext dsl) {
         return new JooqDiscountsInForceRepository(dsl);
     }
@@ -131,6 +139,13 @@ public class ScholarshipsConfiguration {
             DiscountAssignmentRepository assignments, PaymentConceptDirectory concepts, AuditLogWriter auditLogWriter,
             Clock clock) {
         return new ManageDiscounts(transactionRunner, discounts, assignments, concepts, auditLogWriter, clock);
+    }
+
+    @Bean
+    DecideDiscountChange decideDiscountChange(TransactionRunner transactionRunner, DiscountRepository discounts,
+            DiscountDecisionRepository decisions, DiscountAssignmentRepository assignments, PaymentConceptDirectory concepts,
+            AuditLogWriter auditLogWriter, Clock clock) {
+        return new DecideDiscountChange(transactionRunner, discounts, decisions, assignments, concepts, auditLogWriter, clock);
     }
 
     @Bean

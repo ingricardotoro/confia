@@ -117,6 +117,19 @@ public record Benefit(BenefitType type, Percentage percent, Money fixedAmount) {
         return on(base, remaining.isPositive() ? remaining : Money.zero(periodCap.currency()));
     }
 
+    /**
+     * Whether this benefit gives more than {@code current} could, so it needs approval where the current one does not: another type
+     * (the two cannot be compared) or a greater value of the same type.
+     */
+    public boolean widens(Benefit current) {
+        Objects.requireNonNull(current, "current");
+        if (type != current.type) {
+            return true;
+        }
+        return type == BenefitType.PERCENTAGE ? percent.value().compareTo(current.percent.value()) > 0
+                : fixedAmount.isGreaterThan(current.fixedAmount);
+    }
+
     /** Whether the two benefits are the same type and value. */
     public boolean sameAs(Benefit other) {
         return type == other.type && Objects.equals(percent, other.percent) && Objects.equals(fixedAmount, other.fixedAmount);

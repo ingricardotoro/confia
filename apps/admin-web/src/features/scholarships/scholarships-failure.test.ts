@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
-import { assignmentFailureOf, awardFailureOf, classifyAssignmentFailure, classifyAwardFailure } from "./scholarships-failure.ts";
+import { assignmentFailureOf, awardFailureOf, classifyAssignmentFailure, classifyAwardFailure, classifyDiscountFailure, discountFailureOf } from "./scholarships-failure.ts";
 
 // How a refusal of the awards is sorted: the person who requested an award cannot decide it (with the text of the awards, not the one of the payments),
 // the reason of a decision is worded as a bounded text, and a refusal that leaves the outcome unknown keeps the intent so it is sent again.
@@ -79,5 +79,24 @@ describe("assignmentFailureOf", () => {
     expect(assignmentFailureOf(new ApiFailure({ kind: "network" })).outcomeUnknown).toBe(true);
     expect(assignmentFailureOf(new ApiFailure(problem("internal-error", 500))).outcomeUnknown).toBe(true);
     expect(assignmentFailureOf(new Error("boom"))).toEqual({ failure: { kind: "unexpected" }, outcomeUnknown: true });
+  });
+});
+
+describe("classifyDiscountFailure", () => {
+  it("gives the self approval of a discount its own text, with the trace", () => {
+    expect(classifyDiscountFailure(problem("self-approval-forbidden", 403))).toEqual({ kind: "message", key: "scholarships.errors.discountSelfApproval", traceId: "t1" });
+  });
+
+  it("leaves the new business codes of the discounts to the shared classifier", () => {
+    expect(classifyDiscountFailure(problem("discount-pending-approval", 409))).toEqual({ kind: "message", key: "problem.discountPendingApproval", traceId: "t1" });
+    expect(classifyDiscountFailure(problem("invalid-discount-change-state", 409))).toEqual({ kind: "message", key: "problem.invalidDiscountChangeState", traceId: "t1" });
+    expect(classifyAssignmentFailure(problem("discount-terms-changed", 409))).toEqual({ kind: "message", key: "problem.discountTermsChanged", traceId: "t1" });
+  });
+
+  it("keeps the intent of a decision whose outcome is unknown and renews it after a definite refusal", () => {
+    expect(discountFailureOf(new ApiFailure({ kind: "network" })).outcomeUnknown).toBe(true);
+    expect(discountFailureOf(new ApiFailure(problem("self-approval-forbidden", 403))).outcomeUnknown).toBe(false);
+    expect(discountFailureOf(new ApiFailure(problem("internal-error", 500))).outcomeUnknown).toBe(true);
+    expect(discountFailureOf(new Error("boom"))).toEqual({ failure: { kind: "unexpected" }, outcomeUnknown: true });
   });
 });

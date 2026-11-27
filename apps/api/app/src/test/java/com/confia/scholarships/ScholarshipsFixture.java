@@ -5,6 +5,8 @@ import com.confia.charges.ChargesLedgerFixture;
 import com.confia.organization.infrastructure.JooqAcademicStructureDirectory;
 import com.confia.scholarships.application.DecideAward;
 import com.confia.scholarships.application.DecideDiscountAssignment;
+import com.confia.scholarships.application.DecideDiscountChange;
+import com.confia.scholarships.application.DiscountView;
 import com.confia.scholarships.application.ManageDiscounts;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
@@ -15,6 +17,7 @@ import com.confia.scholarships.infrastructure.JooqAssignmentDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqAwardDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqAwardRepository;
 import com.confia.scholarships.infrastructure.JooqDiscountAssignmentRepository;
+import com.confia.scholarships.infrastructure.JooqDiscountDecisionRepository;
 import com.confia.scholarships.infrastructure.JooqDiscountRepository;
 import com.confia.scholarships.infrastructure.JooqScholarshipRepository;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
@@ -97,6 +100,24 @@ public abstract class ScholarshipsFixture extends ChargesLedgerFixture {
         return new DecideDiscountAssignment(transactionRunner(), new JooqDiscountRepository(dsl),
                 new JooqDiscountAssignmentRepository(dsl), new JooqAssignmentDecisionRepository(dsl),
                 new JooqStudentDirectory(dsl), new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    protected DecideDiscountChange decideDiscountChange() {
+        return new DecideDiscountChange(transactionRunner(), new JooqDiscountRepository(dsl), new JooqDiscountDecisionRepository(dsl),
+                new JooqDiscountAssignmentRepository(dsl), new JooqPaymentConceptDirectory(dsl), new JooqAuditLogWriter(dsl), NOW);
+    }
+
+    /**
+     * The approval of a discount that waits (the creation of a campaign one, or a proposal on it) by a person who did not ask for it: a
+     * new super administrator of the institution. The campaign discounts of the tests of accrual apply only once this is done.
+     */
+    protected DiscountView approvedByAnother(UUID institution, DiscountView waiting) {
+        try {
+            return decideDiscountChange().approve(actorOf(institution, "super_admin"), request(), "approve-" + UUID.randomUUID(),
+                    waiting.id(), waiting.version());
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     protected ViewDiscountAssignments viewAssignments() {

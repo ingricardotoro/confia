@@ -35,8 +35,11 @@ export function useAssignmentDetail(id: string) {
   });
 }
 
-/** The answers after which what is on screen is out of date: the assignment is no longer in the state it was shown in, or it does not exist. */
-const STALE_CODES: ReadonlySet<string> = new Set(["invalid-discount-assignment-state", "resource-not-found"]);
+/**
+ * The answers after which what is on screen is out of date: the assignment is no longer in the state it was shown in, its discount changed after it was
+ * requested (`discount-terms-changed`: it is rejected and requested again), or it does not exist.
+ */
+const STALE_CODES: ReadonlySet<string> = new Set(["invalid-discount-assignment-state", "discount-terms-changed", "resource-not-found"]);
 
 /**
  * What every write of the assignments has in common. None moves money (an assignment only changes the charges issued from then on, and the ledger moves

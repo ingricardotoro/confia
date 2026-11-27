@@ -44,7 +44,16 @@ final class ScholarshipMapper {
         return new DiscountResponse(view.id(), view.code(), view.name(), view.kind(), view.benefitType(), view.percent(),
                 ScholarshipMoney.of(view.fixedAmount()), view.validFrom(), view.validTo(), view.stackable(),
                 view.concepts().stream().map(concept -> new ConceptResponse(concept.id(), concept.code(), concept.name())).toList(),
-                view.active(), view.version(), view.inUse(), view.createdAt(), view.updatedAt());
+                view.active(), view.version(), view.inUse(), view.createdAt(), view.updatedAt(), view.approvalStatus(), view.createdBy(),
+                change(view.pendingChange()));
+    }
+
+    private static DiscountChangeResponse change(DiscountView.ChangeView change) {
+        return change == null ? null : new DiscountChangeResponse(change.name(), change.benefitType(), change.percent(),
+                ScholarshipMoney.of(change.fixedAmount()), change.validFrom(), change.validTo(), change.stackable(),
+                change.reactivate(),
+                change.concepts().stream().map(concept -> new ConceptResponse(concept.id(), concept.code(), concept.name())).toList(),
+                change.requestedBy(), change.requestedAt());
     }
 
     static DiscountPageResponse toDiscountResponse(Page<DiscountView> page) {
@@ -55,7 +64,8 @@ final class ScholarshipMapper {
     static AssignmentResponse toAssignmentResponse(AssignmentView view) {
         return new AssignmentResponse(view.id(), view.discountId(), view.discountCode(), view.discountName(), view.studentId(),
                 view.studentCode(), view.validFrom(), view.validTo(), view.status(), view.requestedBy(), view.requestedAt(),
-                assignmentDecision(view.decision()), assignmentDecision(view.revocation()));
+                assignmentDecision(view.decision()), assignmentDecision(view.revocation()), view.discountVersion(),
+                view.benefitType(), view.percent(), ScholarshipMoney.of(view.fixedAmount()));
     }
 
     static AssignmentPageResponse toAssignmentResponse(Page<AssignmentView> page) {

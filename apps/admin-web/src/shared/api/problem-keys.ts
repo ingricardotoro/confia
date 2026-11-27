@@ -79,5 +79,8 @@ export const PROBLEM_KEYS: Readonly<Record<ProblemCode | "unknown", AdminKey>> =
   "discount-scope-locked": "problem.discountScopeLocked",
   "discount-assignment-overlap": "problem.discountAssignmentOverlap",
   "invalid-discount-assignment-state": "problem.invalidDiscountAssignmentState",
+  "discount-pending-approval": "problem.discountPendingApproval",
+  "invalid-discount-change-state": "problem.invalidDiscountChangeState",
+  "discount-terms-changed": "problem.discountTermsChanged",
   unknown: "problem.unexpected",
 };

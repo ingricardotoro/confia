@@ -8,6 +8,7 @@ import com.confia.kernel.CurrencyCode;
 import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
 import com.confia.scholarships.ScholarshipsFixture;
+import com.confia.scholarships.application.DiscountView;
 import com.confia.scholarships.application.ManageDiscounts;
 import com.confia.scholarships.application.ManageScholarships;
 import com.confia.scholarships.application.RequestAward;
@@ -89,10 +90,15 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
         return award;
     }
 
+    /** Creates the discount; a campaign one is approved by another person at once, as it applies only then. */
     private UUID percentDiscount(World w, String code, String kind, String points, boolean stackable, LocalDate from,
             LocalDate to) {
-        return manageDiscounts().create(w.administrator(), request(), code, kind, new ManageDiscounts.Draft("Descuento " + code,
-                "PERCENTAGE", points, null, from, to, stackable, Set.of(w.env().concept()))).id();
+        return settled(w, manageDiscounts().create(w.administrator(), request(), code, kind, new ManageDiscounts.Draft(
+                "Descuento " + code, "PERCENTAGE", points, null, from, to, stackable, Set.of(w.env().concept())))).id();
+    }
+
+    private DiscountView settled(World w, DiscountView created) {
+        return created.approvalStatus().equals("pending") ? approvedByAnother(w.env().institution(), created) : created;
     }
 
     private UUID campaign(World w, String code, String points, boolean stackable) {
@@ -100,8 +106,8 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
     }
 
     private UUID fixedCampaign(World w, String code, String amount, boolean stackable) {
-        return manageDiscounts().create(w.administrator(), request(), code, "campaign", new ManageDiscounts.Draft("Descuento " + code,
-                "FIXED_AMOUNT", null, amount, JAN_1, DEC_31, stackable, Set.of(w.env().concept()))).id();
+        return settled(w, manageDiscounts().create(w.administrator(), request(), code, "campaign", new ManageDiscounts.Draft(
+                "Descuento " + code, "FIXED_AMOUNT", null, amount, JAN_1, DEC_31, stackable, Set.of(w.env().concept())))).id();
     }
 
     private UUID assignment(World w, UUID discount, LocalDate from, LocalDate to) {
@@ -478,8 +484,8 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
         World w = worldOf(seed(1, "1000.00", "15", "HNL", Concepts.TWO_IN_ONE_PLAN));
         addBenefitsAccount(w.env(), "EXPENSE");
         UUID second = secondConcept(w.env());
-        manageDiscounts().create(w.administrator(), request(), "SOLO-SEGUNDO", "campaign", new ManageDiscounts.Draft("Solo el segundo",
-                "PERCENTAGE", "10", null, JAN_1, DEC_31, true, Set.of(second)));
+        settled(w, manageDiscounts().create(w.administrator(), request(), "SOLO-SEGUNDO", "campaign", new ManageDiscounts.Draft(
+                "Solo el segundo", "PERCENTAGE", "10", null, JAN_1, DEC_31, true, Set.of(second))));
 
         accrue(w, "key-1");
 
@@ -586,8 +592,8 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
         UUID award = requestAward().request(w.coordinator(), request(),
                 new RequestAward.Command(created.id(), w.student(), w.year(), FEB_1, JUN_30)).id();
         decideAward().approve(w.administrator(), request(), "approve-1", award);
-        manageDiscounts().create(w.administrator(), request(), "CAMP-10", "campaign", new ManageDiscounts.Draft("Campana",
-                "PERCENTAGE", "10", null, JAN_1, DEC_31, true, Set.of(w.env().concept(), secondConcept(w.env()))));
+        settled(w, manageDiscounts().create(w.administrator(), request(), "CAMP-10", "campaign", new ManageDiscounts.Draft(
+                "Campana", "PERCENTAGE", "10", null, JAN_1, DEC_31, true, Set.of(w.env().concept(), secondConcept(w.env())))));
 
         accrue(w, "key-1");
 
@@ -712,15 +718,15 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
         accrue(w, "key-1");
 
         assertThat(manageDiscounts().get(w.administrator(), request(), discount).inUse()).isTrue();
-        assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), discount, 0,
+        assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), discount, 1,
                 new ManageDiscounts.Draft("Campana", "PERCENTAGE", "20", null, JAN_1, DEC_31, true, Set.of(w.env().concept()))))
                 .isInstanceOf(com.confia.scholarships.domain.DiscountBenefitLockedException.class);
-        assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), discount, 0,
+        assertThatThrownBy(() -> manageDiscounts().update(w.administrator(), request(), discount, 1,
                 new ManageDiscounts.Draft("Campana", "PERCENTAGE", "10", null, JAN_1.minusDays(1), DEC_31, true,
                         Set.of(w.env().concept()))))
                 .isInstanceOf(com.confia.scholarships.domain.DiscountScopeLockedException.class);
         // Narrowing the validity and deactivating are allowed, and the charge already issued does not change.
-        var narrowed = manageDiscounts().update(w.administrator(), request(), discount, 0,
+        var narrowed = manageDiscounts().update(w.administrator(), request(), discount, 1,
                 new ManageDiscounts.Draft("Campana", "PERCENTAGE", "10", null, FEB_1, JUN_30, true, Set.of(w.env().concept())));
         assertThat(narrowed.validFrom()).isEqualTo(FEB_1);
         assertAmount(onlyCharge(w)[1], "100.00");
@@ -793,9 +799,9 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
     void theDatabaseRefusesALineOfADiscountThatDoesNotCoverTheConceptOrIsNotInForceAtThePricingDate() throws SQLException {
         World w = worldOf(seed(1, "1000.00", "15", "HNL", Concepts.TWO_IN_TWO_PLANS));
         addBenefitsAccount(w.env(), "EXPENSE");
-        UUID elsewhere = manageDiscounts().create(w.administrator(), request(), "OTRO-CONCEPTO", "campaign",
+        UUID elsewhere = settled(w, manageDiscounts().create(w.administrator(), request(), "OTRO-CONCEPTO", "campaign",
                 new ManageDiscounts.Draft("Otro concepto", "PERCENTAGE", "10", null, JAN_1, DEC_31, true,
-                        Set.of(secondConcept(w.env())))).id();
+                        Set.of(secondConcept(w.env()))))).id();
         UUID later = percentDiscount(w, "TARDE", "campaign", "10", true, FEB_2, DEC_31);
 
         assertTheDatabaseRefuses(w, offering(elsewhere, "OTRO-CONCEPTO", null, tenPercent()));
@@ -879,15 +885,95 @@ class AccrualDiscountsIT extends ScholarshipsFixture {
         assertThat(lines(w)).hasSize(1);
     }
 
+
+    // --- S7: a campaign discount that nobody else approved gives nothing, in the engine and in the database ---
+
     @Test
-    void theLinesOfOneInstitutionAreInvisibleToAnother() throws SQLException {
+    void aCampaignDiscountThatIsPendingOrRejectedGivesNothingToTheEngineAndTheDatabaseRefusesItsLineToo() throws SQLException {
+        World w = acceptanceWorld();
+        manageDiscounts().create(w.administrator(), request(), "CAMP-PEND", "campaign", new ManageDiscounts.Draft(
+                "Pendiente", "PERCENTAGE", "10", null, JAN_1, DEC_31, true, Set.of(w.env().concept())));
+        DiscountView toReject = manageDiscounts().create(w.administrator(), request(), "CAMP-RECH", "campaign",
+                new ManageDiscounts.Draft("Rechazado", "PERCENTAGE", "10", null, JAN_1, DEC_31, true, Set.of(w.env().concept())));
+        decideDiscountChange().reject(actorOf(w.institution(), "super_admin"), request(), "reject-1", toReject.id(),
+                toReject.version(), REASON);
+
+        // The engine that reads the real database offers neither.
+        accrue(w, "key-1");
+        assertThat(lines(w)).isEmpty();
+        assertAmount(onlyCharge(w)[1], "0.00");
+        // An engine that offers them anyway meets the database.
+        World other = acceptanceWorld();
+        UUID otherPending = manageDiscounts().create(other.administrator(), request(), "CAMP-PEND", "campaign",
+                new ManageDiscounts.Draft("Pendiente", "PERCENTAGE", "10", null, JAN_1, DEC_31, true,
+                        Set.of(other.env().concept()))).id();
+        assertTheDatabaseRefuses(other, offering(otherPending, "CAMP-PEND", null, tenPercent()));
+    }
+
+    @Test
+    void aProposalToWidenACampaignDiscountChangesNothingOfWhatTheEngineAppliesUntilItIsApproved() throws SQLException {
+        World w = acceptanceWorld();
+        DiscountView settled = approvedByAnother(w.institution(), manageDiscounts().create(w.administrator(), request(), "CAMP-10",
+                "campaign", new ManageDiscounts.Draft("Campana", "PERCENTAGE", "10", null, JAN_1, DEC_31, true,
+                        Set.of(w.env().concept()))));
+        DiscountView proposed = manageDiscounts().update(w.administrator(), request(), settled.id(), settled.version(),
+                new ManageDiscounts.Draft("Campana", "PERCENTAGE", "50", null, JAN_1, DEC_31, true, Set.of(w.env().concept())));
+
+        accrue(w, "key-1");
+
+        assertThat(proposed.pendingChange().percent()).isEqualTo("50.00");
+        assertAmount(onlyCharge(w)[1], "100.00");
+    }
+
+    // --- F5: the deferred check of the sum of the lines, with a negative test ---
+
+    @Test
+    void theDatabaseRefusesAtTheCommitAChargeWhoseLinesAddUpToLessThanItsBenefit() throws SQLException {
+        World control = acceptanceWorld();
+        campaign(control, "CAMP-10", "10", true);
+        campaign(control, "CAMP-20", "20", true);
+        accrue(control, "key-1");
+        assertThat(amountsOf(lines(control))).as("the control: both lines are written").containsExactly("100.0000", "180.0000");
+
+        World w = acceptanceWorld();
+        campaign(w, "CAMP-10", "10", true);
+        campaign(w, "CAMP-20", "20", true);
+        // A defect of the engine that loses the second line is made with a trigger of the test that skips it as it is inserted; the
+        // charge then claims a benefit of 280.00 and keeps lines for 100.00. Every other check passes: only the deferred one is left.
+        try (Connection c = StaffRoleFixtures.ownerTransaction(control.institution())) {
+            exec(c, "create function charges_test_skip_second_line() returns trigger language plpgsql as "
+                    + "$$ begin if new.position = 2 then return null; end if; return new; end $$");
+            exec(c, "create trigger charges_charge_benefit_a_skip_trg before insert on charges_charge_benefit "
+                    + "for each row execute function charges_test_skip_second_line()");
+            c.commit();
+        }
+        try {
+            assertTheDatabaseRefuses(w, discountBenefits());
+        } finally {
+            try (Connection c = StaffRoleFixtures.ownerTransaction(control.institution())) {
+                exec(c, "drop trigger if exists charges_charge_benefit_a_skip_trg on charges_charge_benefit");
+                exec(c, "drop function if exists charges_test_skip_second_line()");
+                c.commit();
+            }
+        }
+        assertThat(amountsOf(lines(control))).as("what was written before stays").containsExactly("100.0000", "180.0000");
+    }
+
+    // --- F4 and L3: the lines of one institution are invisible to the role of the application of another ---
+
+    @Test
+    void theLinesOfOneInstitutionAreInvisibleToTheApplicationRoleOfAnotherAndToASessionWithoutInstitution() throws SQLException {
         World w = acceptanceWorld();
         World other = acceptanceWorld();
         campaign(w, "CAMP-10", "10", true);
         accrue(w, "key-1");
 
         assertThat(lines(w)).hasSize(1);
-        assertThat(lines(other)).isEmpty();
-        assertThat(scalar(other.institution(), "select count(*) from charges_charge_benefit")).isZero();
+        // Through the least-privilege role of the application, with the context of each institution (and not as the owner with a
+        // filter): there is one line, so a count of zero is the work of the row-level security and not an empty table.
+        assertThat(countVisibleAsApplication(w.institution(), "charges_charge_benefit")).isEqualTo(1);
+        assertThat(countVisibleAsApplication(other.institution(), "charges_charge_benefit")).isZero();
+        assertThat(countWithSetting(null, "charges_charge_benefit")).as("the setting was never made").isZero();
+        assertThat(countWithSetting("", "charges_charge_benefit")).as("the setting is empty").isZero();
     }
 }

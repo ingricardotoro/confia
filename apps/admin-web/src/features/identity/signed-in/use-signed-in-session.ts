@@ -23,6 +23,8 @@ export type SignedInSession =
       readonly read: "ready";
       /** The codes the current session lists, from the query that is already cached: no copy is kept anywhere else. */
       readonly permissions: readonly string[];
+      /** The account of the current session, from the same query, only to hide what the person would be refused. */
+      readonly accountId: string;
       readonly signingOut: boolean;
       readonly signOutFailed: boolean;
       readonly signOut: () => void;
@@ -65,6 +67,7 @@ export function useSignedInSession(session: AccessSession): SignedInSession {
     authenticated: true,
     read: "ready",
     permissions: read.data.permissions,
+    accountId: read.data.accountId,
     signingOut: signOut.isPending,
     signOutFailed: signOut.isError,
     signOut: () => {

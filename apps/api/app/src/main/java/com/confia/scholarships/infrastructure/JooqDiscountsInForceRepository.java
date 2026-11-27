@@ -7,6 +7,7 @@ import static confia.generated.jooq.tables.ScholarshipsDiscountConcept.SCHOLARSH
 import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Percentage;
 import com.confia.scholarships.application.DiscountsInForceRepository;
+import com.confia.scholarships.domain.ApprovalStatus;
 import com.confia.scholarships.domain.AwardStatus;
 import com.confia.scholarships.domain.Benefit;
 import com.confia.scholarships.domain.BenefitType;
@@ -100,10 +101,12 @@ public final class JooqDiscountsInForceRepository implements DiscountsInForceRep
         return query.fetch(row -> toInForce(row));
     }
 
-    /** Active and with a validity that includes the day, both ends included, in the institution. */
+    /** Active, approved by another person (a campaign discount applies only once it is) and with a validity that includes the day, both ends
+     * included, in the institution. */
     private static Condition inForce(InstitutionId institution, LocalDate on) {
         return SCHOLARSHIPS_DISCOUNT.INSTITUTION_ID.eq(institution.value())
                 .and(SCHOLARSHIPS_DISCOUNT.IS_ACTIVE.isTrue())
+                .and(SCHOLARSHIPS_DISCOUNT.APPROVAL_STATUS.eq(ApprovalStatus.APPROVED.code()))
                 .and(SCHOLARSHIPS_DISCOUNT.VALID_FROM.le(on))
                 .and(SCHOLARSHIPS_DISCOUNT.VALID_TO.ge(on));
     }

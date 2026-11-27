@@ -5,8 +5,10 @@ import com.confia.scholarships.domain.AwardOverlapException;
 import com.confia.scholarships.domain.DiscountAssignmentOverlapException;
 import com.confia.scholarships.domain.DiscountBenefitLockedException;
 import com.confia.scholarships.domain.DiscountScopeLockedException;
+import com.confia.scholarships.domain.DiscountTermsChangedException;
 import com.confia.scholarships.domain.DuplicateDiscountCodeException;
 import com.confia.scholarships.domain.InvalidAssignmentStateException;
+import com.confia.scholarships.domain.InvalidDiscountChangeStateException;
 import com.confia.scholarships.domain.DuplicateScholarshipCodeException;
 import com.confia.scholarships.domain.InactiveReferenceException;
 import com.confia.scholarships.domain.InvalidAwardStateException;
@@ -14,6 +16,7 @@ import com.confia.scholarships.domain.InvalidScholarshipsValueException;
 import com.confia.scholarships.domain.ScholarshipBenefitLockedException;
 import com.confia.scholarships.domain.ScholarshipScopeLockedException;
 import com.confia.scholarships.domain.SelfApprovalForbiddenException;
+import com.confia.scholarships.domain.StaleVersionException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -70,6 +73,8 @@ final class ScholarshipsWrites {
             case "scholarships_discount_code_uq" -> throw new DuplicateDiscountCodeException();
             case "scholarships_discount_decision_key_uq" -> throw new RequestKeyTakenException();
             case "scholarships_discount_decision_kind_uq" -> throw new InvalidAssignmentStateException();
+            case "scholarships_discount_change_decision_key_uq" -> throw new RequestKeyTakenException();
+            case "scholarships_discount_change_decision_version_uq" -> throw new InvalidDiscountChangeStateException();
             default -> throw e;
         }
     }
@@ -116,6 +121,10 @@ final class ScholarshipsWrites {
                     "assignments-outside-validity");
             case "scholarships_discount_decision_self_chk" -> throw new SelfApprovalForbiddenException();
             case "scholarships_discount_decision_state_chk" -> throw new InvalidAssignmentStateException();
+            case "scholarships_discount_change_decision_self_chk" -> throw new SelfApprovalForbiddenException();
+            case "scholarships_discount_change_decision_state_chk" -> throw new InvalidDiscountChangeStateException();
+            case "scholarships_discount_change_decision_version_chk" -> throw new StaleVersionException();
+            case "scholarships_discount_assignment_terms_chk" -> throw new DiscountTermsChangedException();
             default -> throw e;
         }
     }

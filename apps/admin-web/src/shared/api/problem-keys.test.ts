@@ -86,6 +86,9 @@ describe("PROBLEM_KEYS", () => {
     ["discount-scope-locked", "problem.discountScopeLocked"],
     ["discount-assignment-overlap", "problem.discountAssignmentOverlap"],
     ["invalid-discount-assignment-state", "problem.invalidDiscountAssignmentState"],
+    ["discount-pending-approval", "problem.discountPendingApproval"],
+    ["invalid-discount-change-state", "problem.invalidDiscountChangeState"],
+    ["discount-terms-changed", "problem.discountTermsChanged"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

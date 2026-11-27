@@ -57,6 +57,9 @@ export interface SessionModelOptions {
   readonly permissions?: readonly string[];
 }
 
+/** The account of the simulated session. It is the person the other simulated models call `ME`, so a journey can see what the session itself did. */
+export const SESSION_ACCOUNT = "00000000-0000-4000-8000-0000000000a1";
+
 export interface SessionModel {
   /** A signed-in session: the response and both cookies. */
   openSession(): ModelResponse;
@@ -107,7 +110,7 @@ interface RestrictedToken {
 export function createSessionModel(options: SessionModelOptions = {}): SessionModel {
   const clock = options.now ?? Date.now;
   const origins = options.allowedOrigins ?? DEFAULT_ORIGINS;
-  const accountId = crypto.randomUUID();
+  const accountId = SESSION_ACCOUNT;
   const institutionId = crypto.randomUUID();
   // The account holds the secret and the codes of its last enrollment: each call to enroll replaces them, as the backend does (SS100).
   let key = randomBytes(20);

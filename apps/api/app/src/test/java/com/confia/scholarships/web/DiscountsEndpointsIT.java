@@ -239,6 +239,146 @@ class DiscountsEndpointsIT extends ScholarshipsFixture {
                 .isEqualTo(200);
     }
 
+
+
+    // --- S7: the approval of a campaign discount by another person ---
+
+    private static String versionBody(long version) {
+        return "{\"version\":" + version + "}";
+    }
+
+    private static String rejectBody(long version, String reason) {
+        return "{\"version\":" + version + ",\"reason\":\"" + reason + "\"}";
+    }
+
+    @Test
+    void aCampaignDiscountIsBornPendingAndOnlyAnotherPersonWithTheApprovePermissionApprovesItThroughTheRoute() throws SQLException {
+        World w = world();
+        HttpResponse<String> created = post(DISCOUNTS, w.administrator(), discountBody(w, "CAMP-10", "campaign"), null);
+        UUID discount = idOf(created);
+
+        assertThat(created.statusCode()).isEqualTo(201);
+        assertThat(HarnessProcess.json(created).get("approvalStatus").asString()).isEqualTo("pending");
+        assertThat(HarnessProcess.json(created).get("createdBy").asString()).isEqualTo(w.administrator().account().toString());
+        assertThat(HarnessProcess.json(created).get("pendingChange")).isNull();
+        // The one who created it, and the roles without the permission, do not approve it.
+        assertProblem(post(DISCOUNTS + "/" + discount + "/approve", w.administrator(), versionBody(0), "self-1"), 403,
+                "self-approval-forbidden");
+        assertProblem(post(DISCOUNTS + "/" + discount + "/approve", w.cashier(), versionBody(0), "k-1"), 403, "forbidden");
+        assertProblem(post(DISCOUNTS + "/" + discount + "/approve", w.coordinator(), versionBody(0), "k-2"), 403, "forbidden");
+        assertProblem(post(DISCOUNTS + "/" + discount + "/reject", w.coordinator(), rejectBody(0, REASON_TEXT), "k-3"), 403,
+                "forbidden");
+        assertThat(HarnessProcess.json(get(DISCOUNTS + "/" + discount, w.cashier())).get("approvalStatus").asString())
+                .isEqualTo("pending");
+
+        HttpResponse<String> approved = post(DISCOUNTS + "/" + discount + "/approve", w.superAdmin(), versionBody(0), "approve-1");
+        HttpResponse<String> replay = post(DISCOUNTS + "/" + discount + "/approve", w.superAdmin(), versionBody(0), "approve-1");
+
+        assertThat(approved.statusCode()).as(approved.body()).isEqualTo(200);
+        assertThat(HarnessProcess.json(approved).get("approvalStatus").asString()).isEqualTo("approved");
+        assertThat(HarnessProcess.json(approved).get("version").asLong()).isEqualTo(1);
+        assertThat(replay.statusCode()).isEqualTo(200);
+        assertThat(HarnessProcess.json(replay).get("version").asLong()).isEqualTo(1);
+        assertThat(approved.body()).doesNotContain("approve-1");
+        assertProblem(post(DISCOUNTS + "/" + discount + "/approve", w.superAdmin(), versionBody(1), "approve-2"), 409,
+                "invalid-discount-change-state");
+    }
+
+    @Test
+    void theDecisionOnADiscountNeedsItsKeyItsVersionAndAReasonInTheBoundsAndAStaleVersionIsRefused() throws SQLException {
+        World w = world();
+        UUID discount = discount(w, "CAMP-10", "campaign");
+        String approve = DISCOUNTS + "/" + discount + "/approve";
+        String reject = DISCOUNTS + "/" + discount + "/reject";
+
+        assertProblem(post(approve, w.superAdmin(), versionBody(0), null), 400, "idempotency-key-missing");
+        assertProblem(post(approve, w.superAdmin(), "{}", "k-1"), 400, "validation-failed");
+        assertProblem(post(approve, w.superAdmin(), versionBody(-1), "k-2"), 400, "validation-failed");
+        assertProblem(post(approve, w.superAdmin(), versionBody(9), "k-3"), 409, "stale-version");
+        assertProblem(post(reject, w.superAdmin(), rejectBody(0, "corto"), "k-4"), 400, "validation-failed");
+        assertProblem(post(reject, w.superAdmin(), "{\"reason\":\"" + REASON_TEXT + "\"}", "k-5"), 400, "validation-failed");
+        assertThat(HarnessProcess.json(get(DISCOUNTS + "/" + discount, w.cashier())).get("approvalStatus").asString())
+                .isEqualTo("pending");
+    }
+
+    @Test
+    void aRejectedCreationNeverAppliesAndIsNotEditedAndTheReasonStaysOutOfTheResponse() throws SQLException {
+        World w = world();
+        UUID discount = discount(w, "CAMP-10", "campaign");
+
+        HttpResponse<String> rejected = post(DISCOUNTS + "/" + discount + "/reject", w.superAdmin(), rejectBody(0, REASON_TEXT),
+                "reject-1");
+
+        assertThat(rejected.statusCode()).as(rejected.body()).isEqualTo(200);
+        assertThat(HarnessProcess.json(rejected).get("approvalStatus").asString()).isEqualTo("rejected");
+        assertThat(rejected.body()).doesNotContain(REASON_TEXT);
+        assertProblem(put(DISCOUNTS + "/" + discount, w.administrator(), updateBody(w, 1, "5", "2027-01-01", "2027-12-31")), 409,
+                "discount-pending-approval");
+        assertProblem(post(DISCOUNTS + "/" + discount + "/deactivate", w.administrator(), null, null), 409,
+                "discount-pending-approval");
+    }
+
+    @Test
+    void wideningAndReactivatingThroughTheRoutesLeaveProposalsThatAnotherPersonDecides() throws SQLException {
+        World w = world();
+        UUID discount = discount(w, "CAMP-10", "campaign");
+        String path = DISCOUNTS + "/" + discount;
+        assertThat(post(path + "/approve", w.superAdmin(), versionBody(0), "approve-1").statusCode()).isEqualTo(200);
+
+        HttpResponse<String> widened = put(path, w.administrator(), updateBody(w, 1, "25", "2027-01-01", "2027-12-31"));
+
+        assertThat(widened.statusCode()).as(widened.body()).isEqualTo(200);
+        var json = HarnessProcess.json(widened);
+        assertThat(json.get("percent").asString()).as("the terms in force").isEqualTo("10.00");
+        assertThat(json.get("pendingChange").get("percent").asString()).isEqualTo("25.00");
+        assertThat(json.get("pendingChange").get("reactivate").asBoolean()).isFalse();
+        assertThat(json.get("pendingChange").get("requestedBy").asString()).isEqualTo(w.administrator().account().toString());
+        assertThat(json.get("version").asLong()).isEqualTo(2);
+        assertProblem(put(path, w.administrator(), updateBody(w, 2, "30", "2027-01-01", "2027-12-31")), 409,
+                "discount-pending-approval");
+        assertProblem(post(path + "/approve", w.administrator(), versionBody(2), "self-1"), 403, "self-approval-forbidden");
+
+        HttpResponse<String> dropped = post(path + "/reject", w.superAdmin(), rejectBody(2, REASON_TEXT), "reject-1");
+        assertThat(dropped.statusCode()).as(dropped.body()).isEqualTo(200);
+        assertThat(HarnessProcess.json(dropped).get("pendingChange")).isNull();
+        assertThat(HarnessProcess.json(dropped).get("percent").asString()).isEqualTo("10.00");
+
+        // Deactivating is immediate; reactivating is a proposal.
+        HttpResponse<String> off = post(path + "/deactivate", w.administrator(), null, null);
+        assertThat(HarnessProcess.json(off).get("active").asBoolean()).isFalse();
+        HttpResponse<String> asked = post(path + "/reactivate", w.administrator(), null, null);
+        assertThat(HarnessProcess.json(asked).get("active").asBoolean()).isFalse();
+        assertThat(HarnessProcess.json(asked).get("pendingChange").get("reactivate").asBoolean()).isTrue();
+        long version = HarnessProcess.json(asked).get("version").asLong();
+        HttpResponse<String> on = post(path + "/approve", w.superAdmin(), versionBody(version), "approve-2");
+        assertThat(HarnessProcess.json(on).get("active").asBoolean()).isTrue();
+        assertThat(HarnessProcess.json(on).get("pendingChange")).isNull();
+    }
+
+    // --- H2: the approval of an assignment is bound to the terms it was requested for ---
+
+    @Test
+    void theAssignmentShowsTheTermsItWasRequestedForAndIsNotApprovedAfterTheDiscountChanged() throws SQLException {
+        World w = world();
+        UUID discount = discount(w, "CONV-10", "agreement");
+        HttpResponse<String> requested = post(ASSIGNMENTS, w.coordinator(), assignmentBody(w, discount, "2027-02-01", "2027-06-30"),
+                null);
+        UUID assignment = idOf(requested);
+
+        assertThat(HarnessProcess.json(requested).get("discountVersion").asLong()).isZero();
+        assertThat(HarnessProcess.json(requested).get("benefitType").asString()).isEqualTo("PERCENTAGE");
+        assertThat(HarnessProcess.json(requested).get("percent").asString()).isEqualTo("10.00");
+        // The requester raises the discount before anybody approves: the approval would be for something nobody saw.
+        assertThat(put(DISCOUNTS + "/" + discount, w.administrator(), updateBody(w, 0, "90", "2027-01-01", "2027-12-31"))
+                .statusCode()).isEqualTo(200);
+
+        assertProblem(post(ASSIGNMENTS + "/" + assignment + "/approve", w.superAdmin(), null, "approve-1"), 409,
+                "discount-terms-changed");
+        HttpResponse<String> after = get(ASSIGNMENTS + "/" + assignment, w.administrator());
+        assertThat(HarnessProcess.json(after).get("status").asString()).isEqualTo("pending");
+        assertThat(HarnessProcess.json(after).get("percent").asString()).as("what was requested").isEqualTo("10.00");
+    }
+
     // --- A revoked session ---
 
     @Test

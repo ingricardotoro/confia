@@ -3,6 +3,7 @@ import { formatIsoDate } from "../../../shared/format/format-date.ts";
 import { ResourceFormDialog, type ResourceFormView } from "../../../shared/resource-screen/components/ResourceFormDialog.tsx";
 import { TextAreaField } from "../../../shared/resource-screen/components/fields.tsx";
 import { AWARD_REASON_MAX, AWARD_REASON_MIN } from "../award-model.ts";
+import { AssignmentTermsRows } from "./AssignmentTermsRows.tsx";
 import { discountLabelOf, type DiscountAssignment } from "../discounts-types.ts";
 
 export const ASSIGNMENT_REJECT_REASON_ID = "assignment-reject-reason";
@@ -17,6 +18,7 @@ function Restatement({ assignment }: { readonly assignment: DiscountAssignment }
       <dd>{assignment.studentCode ?? t("scholarships.assignments.detail.noValue")}</dd>
       <dt className="text-text-secondary">{t("scholarships.assignments.detail.fields.discount")}</dt>
       <dd>{discountLabelOf(assignment) ?? t("scholarships.assignments.detail.noValue")}</dd>
+      <AssignmentTermsRows assignment={assignment} />
       <dt className="text-text-secondary">{t("scholarships.assignments.detail.fields.validity")}</dt>
       <dd>{t("scholarships.assignments.detail.validityValue", { from: formatIsoDate(assignment.validFrom), to: formatIsoDate(assignment.validTo) })}</dd>
     </dl>

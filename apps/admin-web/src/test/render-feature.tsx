@@ -27,6 +27,8 @@ export interface RenderedFeature extends RenderResult {
 export interface RenderFeatureOptions {
   /** The permissions of the session. Every code the panel knows when absent, so the screens are tested with a role that can do everything. */
   readonly permissions?: readonly string[];
+  /** The account of the session. Absent when the test does not care who the person is. */
+  readonly accountId?: string;
 }
 
 /**
@@ -44,7 +46,7 @@ export function renderFeature(feature: FeatureModule, path: string, options: Ren
   const rendered = render(
     <AppProviders queryClient={queryClient} i18n={createAdminI18n()}>
       <AuthorizedSendProvider send={send}>
-        <PermissionsProvider permissions={options.permissions ?? PERMISSION_CODES}>
+        <PermissionsProvider permissions={options.permissions ?? PERMISSION_CODES} accountId={options.accountId}>
           <RouterProvider router={router} />
         </PermissionsProvider>
       </AuthorizedSendProvider>

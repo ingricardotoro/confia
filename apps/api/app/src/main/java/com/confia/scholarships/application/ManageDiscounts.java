@@ -1,7 +1,6 @@
 package com.confia.scholarships.application;
 
 import com.confia.catalog.application.directory.PaymentConceptDirectory;
-import com.confia.catalog.application.directory.PaymentConceptLabel;
 import com.confia.catalog.application.directory.PaymentConceptRef;
 import com.confia.kernel.InstitutionId;
 import com.confia.scholarships.domain.Benefit;
@@ -16,10 +15,6 @@ import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.TransactionRunner;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -31,6 +26,11 @@ import java.util.UUID;
  * shortens and its concepts are only removed (another discount is created); the database refuses it too. An edit locks the row of
  * the discount {@code FOR UPDATE} and asks for the version the editor saw. A concept that is newly covered must exist in the
  * institution and be active.
+ *
+ * <p>A campaign discount applies to every charge, so another person approves it (S7, {@link DecideDiscountChange}): creating one
+ * leaves it pending, and widening or reactivating one leaves a proposal; the result of an edit then carries the terms proposed in
+ * {@code pendingChange} and the terms in force stay. Narrowing and deactivating are immediate, and an agreement discount (which
+ * applies only through an approved assignment) needs no approval of its own.
  */
 public final class ManageDiscounts {
 
@@ -38,6 +38,7 @@ public final class ManageDiscounts {
     private final DiscountRepository discounts;
     private final DiscountAssignmentRepository assignments;
     private final PaymentConceptDirectory concepts;
+    private final DiscountViews views;
     private final AuditLogWriter auditLogWriter;
     private final Clock clock;
 
@@ -48,6 +49,7 @@ public final class ManageDiscounts {
         this.discounts = Objects.requireNonNull(discounts, "discounts");
         this.assignments = Objects.requireNonNull(assignments, "assignments");
         this.concepts = Objects.requireNonNull(concepts, "concepts");
+        this.views = new DiscountViews(concepts, assignments);
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -86,7 +88,7 @@ public final class ManageDiscounts {
             requireCoverable(institution, created.concepts(), Set.of());
             discounts.insert(institution, created);
             auditLogWriter.append(DiscountsAudit.discountCreated(actor, auditRequestId, created));
-            return view(institution, created, false);
+            return views.view(institution, created, false);
         });
     }
 
@@ -113,12 +115,15 @@ public final class ManageDiscounts {
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             Discount before = discounts.lockById(institution, id).orElseThrow(ResourceNotFoundException::new);
             boolean inUse = assignments.inUse(institution, Set.of(id)).contains(id);
-            Discount after = before.edit(version, draft.name(), benefit, draft.validFrom(), draft.validTo(), draft.conceptIds(),
+            Discount after = before.edit(version, actor.accountId(), draft.name(), benefit, draft.validFrom(), draft.validTo(), draft.conceptIds(),
                     draft.stackable(), inUse, clock.instant());
-            requireCoverable(institution, after.concepts(), before.concepts());
+            // A proposal leaves the covered concepts in force as they are: the ones it asks for are the ones to check.
+            requireCoverable(institution, after.proposal() == null ? after.concepts() : after.proposal().concepts(),
+                    before.concepts());
             discounts.replace(institution, after, version);
-            auditLogWriter.append(DiscountsAudit.discountUpdated(actor, auditRequestId, before, after));
-            return view(institution, after, inUse);
+            auditLogWriter.append(after.proposal() == null ? DiscountsAudit.discountUpdated(actor, auditRequestId, before, after)
+                    : DiscountsAudit.discountChangeRequested(actor, auditRequestId, before, after));
+            return views.view(institution, after, inUse);
         });
     }
 
@@ -139,12 +144,14 @@ public final class ManageDiscounts {
         InstitutionId institution = new InstitutionId(actor.institutionId());
         return transactionRunner.execute(actor.securityContext(auditRequestId.toString()), () -> {
             Discount before = discounts.lockById(institution, id).orElseThrow(ResourceNotFoundException::new);
-            Discount after = before.withActive(active, clock.instant());
+            Discount after = before.withActive(active, actor.accountId(), clock.instant());
             if (after != before) {
                 discounts.replace(institution, after, before.version());
-                auditLogWriter.append(DiscountsAudit.discountActivation(actor, auditRequestId, before, after));
+                auditLogWriter.append(after.proposal() != null && before.proposal() == null
+                        ? DiscountsAudit.discountChangeRequested(actor, auditRequestId, before, after)
+                        : DiscountsAudit.discountActivation(actor, auditRequestId, before, after));
             }
-            return view(institution, after, assignments.inUse(institution, Set.of(id)).contains(id));
+            return views.one(institution, after);
         });
     }
 
@@ -161,12 +168,7 @@ public final class ManageDiscounts {
         UUID auditRequestId = ScholarshipRequests.requestId(Objects.requireNonNull(requestId, "requestId"));
         InstitutionId institution = new InstitutionId(actor.institutionId());
         return transactionRunner.executeReadOnly(actor.securityContext(auditRequestId.toString()), () -> {
-            Page<Discount> found = discounts.list(institution, filter, page);
-            Set<UUID> ids = new HashSet<>();
-            found.items().forEach(discount -> ids.add(discount.id()));
-            Set<UUID> inUse = ids.isEmpty() ? Set.of() : assignments.inUse(institution, ids);
-            Map<UUID, PaymentConceptLabel> labels = labelsOf(institution, found.items());
-            return found.map(discount -> DiscountView.of(discount, conceptViews(discount, labels), inUse.contains(discount.id())));
+            return views.page(institution, discounts.list(institution, filter, page));
         });
     }
 
@@ -177,7 +179,7 @@ public final class ManageDiscounts {
         InstitutionId institution = new InstitutionId(actor.institutionId());
         return transactionRunner.executeReadOnly(actor.securityContext(auditRequestId.toString()), () -> {
             Discount found = discounts.findById(institution, id).orElseThrow(ResourceNotFoundException::new);
-            return view(institution, found, assignments.inUse(institution, Set.of(id)).contains(id));
+            return views.one(institution, found);
         });
     }
 
@@ -193,22 +195,6 @@ public final class ManageDiscounts {
                 throw new InactiveReferenceException();
             }
         }
-    }
-
-    private DiscountView view(InstitutionId institution, Discount discount, boolean inUse) {
-        Map<UUID, PaymentConceptLabel> labels = labelsOf(institution, List.of(discount));
-        return DiscountView.of(discount, conceptViews(discount, labels), inUse);
-    }
-
-    private Map<UUID, PaymentConceptLabel> labelsOf(InstitutionId institution, Collection<Discount> found) {
-        Set<UUID> ids = new HashSet<>();
-        found.forEach(discount -> ids.addAll(discount.concepts()));
-        return ids.isEmpty() ? Map.of() : concepts.labels(institution, ids);
-    }
-
-    private static List<DiscountView.ConceptView> conceptViews(Discount discount, Map<UUID, PaymentConceptLabel> labels) {
-        return discount.concepts().stream().map(id -> labels.get(id)).filter(Objects::nonNull)
-                .map(label -> new DiscountView.ConceptView(label.id(), label.code(), label.name())).toList();
     }
 
     private static boolean isBenefitType(String value) {

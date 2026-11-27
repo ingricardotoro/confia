@@ -1,5 +1,6 @@
 package com.confia.scholarships.web;
 
+import com.confia.scholarships.application.DecideDiscountChange;
 import com.confia.scholarships.application.DiscountFilter;
 import com.confia.scholarships.application.ManageDiscounts;
 import com.confia.scholarships.application.PageRequest;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -35,7 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * The routes of the discounts under {@code /api/v1/scholarships/discounts} (docs/cortes/scholarships-discounts.md). The permission
  * each route needs is decided before the controller runs, by the permission decider over {@code PermissionedEndpoints}: {@code
- * scholarships:read} to list and read, and {@code scholarships:create} to create, edit, deactivate and reactivate. The institution is
+ * scholarships:read} to list and read, {@code scholarships:create} to create, edit, deactivate and reactivate, and {@code
+ * scholarships:approve} to approve or reject the creation of a campaign discount and the proposals on it (a second person decides: the
+ * creation of a campaign discount and its widening or reactivation apply only once approved). The institution is
  * the one of the token, never a member of a request, and nothing is deleted. A discount of another institution and an unknown one look
  * the same: 404. Every amount is rounded by the server.
  */
@@ -46,11 +50,14 @@ public class DiscountController {
     private static final String TAG = "discounts";
     private static final String PROBLEM_JSON = "application/problem+json";
     private static final String PROBLEM_DETAIL_REF = "#/components/schemas/" + ContractSchemas.PROBLEM_DETAIL;
+    private static final String KEY_DESCRIPTION = "1 to 128 visible characters, unique per request";
 
     private final ManageDiscounts discounts;
+    private final DecideDiscountChange decideChange;
 
-    public DiscountController(ManageDiscounts discounts) {
+    public DiscountController(ManageDiscounts discounts, DecideDiscountChange decideChange) {
         this.discounts = discounts;
+        this.decideChange = decideChange;
     }
 
     @RateLimited(policy = "admin-read")
@@ -235,5 +242,86 @@ public class DiscountController {
             content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
     public DiscountResponse reactivate(@PathVariable("id") UUID id) {
         return ScholarshipMapper.toResponse(discounts.reactivate(RequestContext.actor(), RequestContext.requestId(), id));
+    }
+
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
+    @PostMapping(path = "/{id}/approve", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(operationId = "approveDiscountChange", tags = TAG, summary = "Approves the creation of a campaign discount or a proposal on it",
+            description = "A campaign discount applies to nothing until a person other than the one who created it approves it, and a "
+                    + "proposal to widen it (another type of benefit or a greater value, an earlier start or a later end, a concept "
+                    + "more, stackable turned on) or to reactivate it changes nothing until a person other than the one who proposed "
+                    + "it approves it. Approving makes it the terms in force from then on; the charges already issued do not change. "
+                    + "The body names the version of the discount the person saw. The Idempotency-Key header is required and stored "
+                    + "permanently on the decision. Needs the permission scholarships:approve.",
+            security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-required-permission", value = "scholarships:approve")))
+    @ApiResponse(responseCode = "200", description = "The discount, approved (or the discount the key already approved)",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = DiscountResponse.class)))
+    @ApiResponse(responseCode = "400", description = "The body or the Idempotency-Key is not valid (validation-failed, idempotency-key-missing)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "401",
+            description = "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "403",
+            description = "The account does not hold scholarships:approve, the Origin is missing or not allowed (forbidden, csrf-invalid), "
+                    + "or the actor asked for what waits (self-approval-forbidden)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "404", description = "The discount does not exist in the institution of the token (resource-not-found)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "409",
+            description = "Nothing waits for a decision (invalid-discount-change-state), the version is not the current one "
+                    + "(stale-version), a concept the proposal adds is inactive (inactive-reference), or the database refuses the "
+                    + "terms because the discount is in use (discount-benefit-locked, discount-scope-locked)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "422", description = "The Idempotency-Key was used for another request (idempotency-payload-mismatch)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    public DiscountResponse approve(@PathVariable("id") UUID id,
+            @Parameter(required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody DiscountDecisionRequest request) {
+        return ScholarshipMapper.toResponse(ScholarshipController.named(() -> decideChange.approve(RequestContext.actor(),
+                RequestContext.requestId(), idempotencyKey, id, request.version())));
+    }
+
+    @RateLimited(policy = "admin-write")
+    @RateLimited(policy = "admin-write-account", key = RateLimitKey.ACCOUNT)
+    @PostMapping(path = "/{id}/reject", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(operationId = "rejectDiscountChange", tags = TAG, summary = "Rejects the creation of a campaign discount or a proposal on it",
+            description = "Rejects what waits on a campaign discount with a reason of 20 to 500 characters, kept only in the decision: a "
+                    + "proposal is dropped and the terms in force stay; a creation is rejected for good and the discount never "
+                    + "applies. Whoever asked for what waits cannot reject it. The body names the version of the discount the person "
+                    + "saw. The Idempotency-Key header is required and stored permanently on the decision. Needs the permission "
+                    + "scholarships:approve.",
+            security = @SecurityRequirement(name = ContractSchemas.BEARER_AUTH),
+            extensions = @Extension(properties = @ExtensionProperty(name = "x-required-permission", value = "scholarships:approve")))
+    @ApiResponse(responseCode = "200", description = "The discount, after the rejection (or the discount the key already rejected)",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = DiscountResponse.class)))
+    @ApiResponse(responseCode = "400", description = "The body or the Idempotency-Key is not valid (validation-failed, idempotency-key-missing)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "401",
+            description = "No credential (authentication-required), or a credential that cannot be accepted (token-expired, token-invalid)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "403",
+            description = "The account does not hold scholarships:approve, the Origin is missing or not allowed (forbidden, csrf-invalid), "
+                    + "or the actor asked for what waits (self-approval-forbidden)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "404", description = "The discount does not exist in the institution of the token (resource-not-found)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "409",
+            description = "Nothing waits for a decision (invalid-discount-change-state) or the version is not the current one (stale-version)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "422", description = "The Idempotency-Key was used for another request (idempotency-payload-mismatch)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    @ApiResponse(responseCode = "500", description = "Unexpected failure (internal-error)",
+            content = @Content(mediaType = PROBLEM_JSON, schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    public DiscountResponse reject(@PathVariable("id") UUID id,
+            @Parameter(required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody RejectDiscountChangeRequest request) {
+        return ScholarshipMapper.toResponse(ScholarshipController.named(() -> decideChange.reject(RequestContext.actor(),
+                RequestContext.requestId(), idempotencyKey, id, request.version(), request.reason())));
     }
 }

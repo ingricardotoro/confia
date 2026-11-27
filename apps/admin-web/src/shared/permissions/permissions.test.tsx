@@ -21,6 +21,27 @@ describe("usePermissions", () => {
     expect(screen.getAllByRole("paragraph").map((node) => node.textContent)).toEqual(["yes", "no"]);
   });
 
+  it("hands over the account of the session, and none outside a provider or when the session does not say", () => {
+    function Who() {
+      return <p>{usePermissions().accountId ?? "nobody"}</p>;
+    }
+    const { rerender } = render(
+      <PermissionsProvider permissions={[]} accountId="00000000-0000-4000-8000-0000000000a1">
+        <Who />
+      </PermissionsProvider>,
+    );
+    expect(screen.getByText("00000000-0000-4000-8000-0000000000a1")).toBeInTheDocument();
+
+    rerender(
+      <PermissionsProvider permissions={[]}>
+        <Who />
+      </PermissionsProvider>,
+    );
+    expect(screen.getByText("nobody")).toBeInTheDocument();
+    rerender(<Who />);
+    expect(screen.getByText("nobody")).toBeInTheDocument();
+  });
+
   it("grants nothing outside a provider", () => {
     render(<Probe permission="charges:read" />);
 

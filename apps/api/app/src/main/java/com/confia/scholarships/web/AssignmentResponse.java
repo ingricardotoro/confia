@@ -27,7 +27,16 @@ public record AssignmentResponse(
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, description = "The approval or the rejection, once there is one")
         @JsonInclude(JsonInclude.Include.NON_NULL) AssignmentDecisionResponse decision,
         @Schema(requiredMode = RequiredMode.NOT_REQUIRED, description = "The revocation, once there is one")
-        @JsonInclude(JsonInclude.Include.NON_NULL) AssignmentDecisionResponse revocation) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) AssignmentDecisionResponse revocation,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true,
+                description = "The version of the discount when the assignment was requested: the approval is bound to it, and refused with discount-terms-changed when the discount changed since; absent for an assignment from before it was kept")
+        Long discountVersion,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true, allowableValues = {"PERCENTAGE", "FIXED_AMOUNT"},
+                description = "The type of the benefit of the discount at the request")
+        String benefitType,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true, description = "Percentage points with two decimals; only PERCENTAGE")
+        String percent,
+        @Schema(requiredMode = RequiredMode.NOT_REQUIRED, nullable = true, description = "Only FIXED_AMOUNT") ScholarshipMoney fixedAmount) {
 
     @Override
     public String toString() {

@@ -1409,11 +1409,30 @@ export function discount(override: Partial<DiscountResponseOutput> = {}): Discou
     concepts: [{ id: "00000000-0000-4000-8000-000000007001", code: "MENS", name: "Mensualidad" }],
     active: true,
     inUse: false,
+    approvalStatus: "approved",
+    createdBy: "00000000-0000-4000-8000-0000000000a1",
     version: 0,
     createdAt: STAMP,
     updatedAt: STAMP,
     ...override,
   });
+}
+
+/** The terms a person proposed to widen or reactivate a campaign discount (S7): a greater value of 15 %, waiting for another person. */
+export function discountProposal(override: Partial<NonNullable<DiscountResponseOutput["pendingChange"]>> = {}): NonNullable<DiscountResponseOutput["pendingChange"]> {
+  return {
+    name: "Campaña de matrícula",
+    benefitType: "PERCENTAGE",
+    percent: "15.00",
+    validFrom: "2027-01-01",
+    validTo: "2027-12-31",
+    stackable: true,
+    reactivate: false,
+    concepts: [{ id: "00000000-0000-4000-8000-000000007001", code: "MENS", name: "Mensualidad" }],
+    requestedBy: "00000000-0000-4000-8000-0000000000a1",
+    requestedAt: STAMP,
+    ...override,
+  };
 }
 
 export function discountRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
@@ -1437,6 +1456,9 @@ export function assignment(override: Partial<AssignmentResponseOutput> = {}): As
     discountId: "00000000-0000-4000-8000-0000000e0101",
     discountCode: "CONV20",
     discountName: "Convenio con la empresa",
+    discountVersion: 0,
+    benefitType: "PERCENTAGE",
+    percent: "20.00",
     validFrom: "2027-01-01",
     validTo: "2027-12-31",
     status: "pending",

@@ -1920,6 +1920,40 @@ export const MATRIX: readonly GateCombination[] = [
     },
     expected: (page) => page.getByRole("dialog", { name: "Editar el descuento" }),
   },
+  // The approval of a campaign discount (S7): the dialogs of the decision on what another person created, and a proposal that waits beside the terms in force.
+  {
+    route: DISCOUNTS,
+    state: "approve-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, DISCOUNTS);
+      await page.getByRole("button", { name: "Aprobar Campaña de verano" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Aprobar el descuento" }),
+  },
+  {
+    route: DISCOUNTS,
+    state: "reject-dialog",
+    opensDialog: true,
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, DISCOUNTS);
+      await page.getByRole("button", { name: "Rechazar Campaña de verano" }).click();
+    },
+    expected: (page) => page.getByRole("dialog", { name: "Rechazar el descuento" }),
+  },
+  {
+    route: DISCOUNTS,
+    state: "proposal-pending",
+    arrange: async (page) => {
+      await openScholarshipsRoute(page, DISCOUNTS);
+      await page.getByRole("button", { name: "Editar Campaña de matrícula" }).click();
+      await page.getByRole("dialog", { name: "Editar el descuento" }).getByLabel(/^Porcentaje/).fill("25");
+      await page.getByRole("dialog", { name: "Editar el descuento" }).getByRole("button", { name: "Guardar" }).click();
+      // The page is analyzed once the dialog is gone, not while it fades out over the table.
+      await page.getByRole("dialog").waitFor({ state: "detached" });
+    },
+    expected: (page) => page.getByRole("table", { name: "Descuentos de la institución" }).getByRole("row", { name: /Campaña de matrícula.*Propuesta pendiente/ }),
+  },
   // The agreement assignments (scholarships-discounts cut): the list with rows and empty, the request, the detail of a pending one with its reject dialog.
   {
     route: ASSIGNMENTS,
