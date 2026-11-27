@@ -1065,6 +1065,41 @@ class DiscountsIT extends ScholarshipsFixture {
                 "2027-02-01", "2027-06-30", w.coordinator().accountId());
     }
 
+    // --- A1: the author of a discount is the account of the session ---
+
+    @Test
+    void theDatabaseRefusesADiscountCreatedInTheNameOfAnotherAccountOrOfNobody() throws SQLException {
+        World w = world();
+        String insert = "insert into scholarships_discount (institution_id, id, code, name, kind, benefit_type, percent, valid_from, "
+                + "valid_to, is_stackable, created_by, approval_status) values (?, ?, ?, 'N', 'campaign', 'PERCENTAGE', 10, "
+                + "date '2027-01-01', date '2027-12-31', true, ?, 'pending')";
+
+        // The session is the coordinator's and the row names the administrator: nobody creates in the name of another.
+        assertThatThrownBy(() -> execAsActor(w, w.coordinator().accountId(), insert, w.institution(), UUID.randomUUID(), "AJENO",
+                w.administrator().accountId())).isInstanceOf(SQLException.class)
+                .hasMessageContaining("created by the person of the session");
+        // No session account at all.
+        assertThatThrownBy(() -> execAsOwner(w, insert, w.institution(), UUID.randomUUID(), "NADIE", w.administrator().accountId()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("created by the person of the session");
+        // The author of the session is accepted: every discount these tests create goes through the use case, which writes it so.
+        assertThat(agreement(w, "CONV-10", "10").id()).isNotNull();
+    }
+
+    // --- A2: every change of a discount takes the next version ---
+
+    @Test
+    void theDatabaseRefusesAChangeOfADiscountThatKeepsOrSkipsItsVersion() throws SQLException {
+        World w = world();
+        DiscountView discount = agreement(w, "CONV-10", "10");
+        String rename = "update scholarships_discount set name = ?, version = version + ? where institution_id = ? and id = ?";
+
+        assertThatThrownBy(() -> execAsOwner(w, rename, "Mismo", 0, w.institution(), discount.id()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("takes the next version");
+        assertThatThrownBy(() -> execAsOwner(w, rename, "Salto", 2, w.institution(), discount.id()))
+                .isInstanceOf(SQLException.class).hasMessageContaining("takes the next version");
+        execAsOwner(w, rename, "Siguiente", 1, w.institution(), discount.id());
+    }
+
     // --- S8 in the database: the stackable flag of a discount in use is locked ---
 
     @Test

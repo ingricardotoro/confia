@@ -360,3 +360,17 @@ actualiza ni borra ninguna fila; V39 y V40 no se tocan porque las bases locales 
   la capa del diálogo o el desplazamiento del aviso como contraste «parcialmente cubierto»): lo cubren las combinaciones de la matriz de la compuerta, que
   aísla el diálogo y espera a que cierre.
 - Las pruebas de componente se escribieron después del código; el rojo se observó por mutación (ver el registro de la tarea).
+
+## Lo construido (avisos de la segunda revisión de seguridad, 2026-11-27)
+
+La migración V42 cierra los dos avisos que dejó la segunda revisión de seguridad, sin cambiar ninguna fila guardada:
+
+- **A1.** La base de datos exige que quien crea un descuento sea la persona de la sesión (`created_by` igual a `app.actor_id`), con
+  la misma regla que ya tenían las asignaciones y las becas. Así, la comprobación de que nadie aprueba su propia campaña no depende
+  de lo que escriba quien inserta la fila.
+- **A2.** Todo cambio de un descuento lleva la versión siguiente (exactamente una más). La aprobación de una asignación y la decisión
+  sobre una campaña se atan a la versión, y ahora la base de datos garantiza que ningún cambio la deja igual.
+
+Las dos comprobaciones corren después de escribir la fila, de modo que las reglas de V39 a V41, las restricciones y la seguridad por
+fila siguen respondiendo primero con su propio motivo. La aplicación ya cumplía ambas reglas, así que no cambia su comportamiento.
+
