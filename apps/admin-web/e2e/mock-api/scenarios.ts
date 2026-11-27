@@ -9,6 +9,7 @@ import {
 import { DEFAULT_CATALOG, createCatalogModel, type CatalogModel, type CatalogOptions } from "./catalog-model.ts";
 import { DEFAULT_CHARGES, createChargesModel, type ChargesModel, type ChargesOptions } from "./charges-model.ts";
 import { DEFAULT_CASHBOX, createCashboxModel, type CashboxModel, type CashboxOptions } from "./cashbox-model.ts";
+import { DEFAULT_DISCOUNTS, createDiscountsModel, type DiscountsModel, type DiscountsOptions } from "./discounts-model.ts";
 import { DEFAULT_SCHOLARSHIPS, createScholarshipsModel, type ScholarshipsModel, type ScholarshipsOptions } from "./scholarships-model.ts";
 import { DEFAULT_PAYMENTS, createPaymentsModel, type PaymentsModel, type PaymentsOptions } from "./payments-model.ts";
 import { DEFAULT_CHARGE_VOID, createChargeVoidModel, type ChargeVoidModel, type ChargeVoidOptions } from "./charge-void-model.ts";
@@ -79,6 +80,8 @@ interface PresetDefinition {
   readonly payments?: PaymentsOptions;
   /** The scholarships and their awards the scenario holds; the seeded ones when absent. */
   readonly scholarships?: ScholarshipsOptions;
+  /** The discounts and their agreement assignments the scenario holds; the seeded ones when absent. */
+  readonly discounts?: DiscountsOptions;
   /** A fault injected after the model answered, to prove the server refuses to send it. */
   readonly tamper?: (operation: Operation, response: ModelResponse) => ModelResponse;
 }
@@ -185,6 +188,9 @@ const PRESETS: Readonly<Record<string, PresetDefinition>> = {
   // The scholarships (scholarships-awards cut): none at all, and reads that fail first.
   "scholarships-empty": { login: "authenticated", enrolled: false, scholarships: { ...DEFAULT_SCHOLARSHIPS, seed: "none" } },
   "scholarships-server-error": { login: "authenticated", enrolled: false, scholarships: { ...DEFAULT_SCHOLARSHIPS, reads: "failing-first" } },
+  // The discounts (scholarships-discounts cut): none at all, and reads that fail first.
+  "discounts-empty": { login: "authenticated", enrolled: false, discounts: { ...DEFAULT_DISCOUNTS, seed: "none" } },
+  "discounts-server-error": { login: "authenticated", enrolled: false, discounts: { ...DEFAULT_DISCOUNTS, reads: "failing-first" } },
   "payments-accounts-incomplete": { login: "authenticated", enrolled: false, payments: { ...DEFAULT_PAYMENTS, accounts: "incomplete" } },
   "statement-empty": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, seed: "empty" } },
   "statement-forbidden": { login: "authenticated", enrolled: false, statement: { ...DEFAULT_STATEMENT, access: "forbidden" } },
@@ -218,6 +224,7 @@ export interface Scenario {
   readonly cashbox: CashboxModel;
   readonly payments: PaymentsModel;
   readonly scholarships: ScholarshipsModel;
+  readonly discounts: DiscountsModel;
   readonly calls: RecordedCall[];
   readonly tamper: PresetDefinition["tamper"];
   signIn(sleep: (ms: number) => Promise<void>): Promise<ModelResponse>;
@@ -249,6 +256,11 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     concepts: () => catalog.rows(),
     now: () => new Date(),
   });
+  const discounts = createDiscountsModel(definition.discounts ?? DEFAULT_DISCOUNTS, {
+    students: () => students.rows().students,
+    concepts: () => catalog.rows(),
+    now: () => new Date(),
+  });
   const statement = createStatementModel(definition.statement ?? DEFAULT_STATEMENT, { students });
   const chargeVoid = createChargeVoidModel(definition.chargeVoid ?? DEFAULT_CHARGE_VOID, { students });
   const cashbox = createCashboxModel(definition.cashbox ?? DEFAULT_CASHBOX);
@@ -268,6 +280,7 @@ function build(preset: string, definition: PresetDefinition): Scenario {
     cashbox,
     payments: createPaymentsModel(definition.payments ?? DEFAULT_PAYMENTS, { students, charges: chargeVoid, statement, cashbox }),
     scholarships,
+    discounts,
     calls: [],
     tamper: definition.tamper,
     async signIn(sleep) {

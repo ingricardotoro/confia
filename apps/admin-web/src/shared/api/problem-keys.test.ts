@@ -81,6 +81,11 @@ describe("PROBLEM_KEYS", () => {
     ["scholarship-award-overlap", "problem.scholarshipAwardOverlap"],
     ["scholarship-scope-locked", "problem.scholarshipScopeLocked"],
     ["invalid-award-state", "problem.invalidAwardState"],
+    ["duplicate-discount-code", "problem.duplicateDiscountCode"],
+    ["discount-benefit-locked", "problem.discountBenefitLocked"],
+    ["discount-scope-locked", "problem.discountScopeLocked"],
+    ["discount-assignment-overlap", "problem.discountAssignmentOverlap"],
+    ["invalid-discount-assignment-state", "problem.invalidDiscountAssignmentState"],
   ] as const)("maps %s to %s", (code, key) => {
     expect(PROBLEM_KEYS[code]).toBe(key);
   });

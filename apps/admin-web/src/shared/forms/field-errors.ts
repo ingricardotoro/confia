@@ -87,6 +87,10 @@ export function fieldErrorKey(reason: string): AdminKey {
       return "catalog.taxRates.errors.duplicateCode";
     case "duplicate-scholarship-code":
       return "scholarships.errors.duplicateCode";
+    case "duplicate-discount-code":
+      return "scholarships.errors.duplicateDiscountCode";
+    case "assignments-outside-validity":
+      return "scholarships.errors.assignmentsOutsideValidity";
     case "outside-academic-year":
       return "scholarships.errors.outsideAcademicYear";
     case "duplicate-account-code":

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiFailure } from "../../shared/api/api-failure.ts";
-import { classifyAwardFailure, awardFailureOf } from "./scholarships-failure.ts";
+import { assignmentFailureOf, awardFailureOf, classifyAssignmentFailure, classifyAwardFailure } from "./scholarships-failure.ts";
 
 // How a refusal of the awards is sorted: the person who requested an award cannot decide it (with the text of the awards, not the one of the payments),
 // the reason of a decision is worded as a bounded text, and a refusal that leaves the outcome unknown keeps the intent so it is sent again.
@@ -45,5 +45,39 @@ describe("awardFailureOf", () => {
     expect(awardFailureOf(new ApiFailure({ kind: "unexpected-response", status: 200 })).outcomeUnknown).toBe(true);
     expect(awardFailureOf(new ApiFailure(problem("internal-error", 500))).outcomeUnknown).toBe(true);
     expect(awardFailureOf(new Error("boom"))).toEqual({ failure: { kind: "unexpected" }, outcomeUnknown: true });
+  });
+});
+
+describe("classifyAssignmentFailure", () => {
+  it("gives the self approval the text of the assignments, not the one of the awards, and keeps the trace", () => {
+    expect(classifyAssignmentFailure(problem("self-approval-forbidden", 403))).toEqual({ kind: "message", key: "scholarships.errors.assignmentSelfApproval", traceId: "t1" });
+    expect(classifyAwardFailure(problem("self-approval-forbidden", 403))).toEqual({ kind: "message", key: "scholarships.errors.selfApproval", traceId: "t1" });
+  });
+
+  it("tells the codes of the assignments with their own text", () => {
+    expect(classifyAssignmentFailure(problem("discount-assignment-overlap", 409))).toEqual({ kind: "message", key: "problem.discountAssignmentOverlap", traceId: "t1" });
+    expect(classifyAssignmentFailure(problem("invalid-discount-assignment-state", 409))).toEqual({
+      kind: "message",
+      key: "problem.invalidDiscountAssignmentState",
+      traceId: "t1",
+    });
+  });
+
+  it("words the size of the reason as a bounded text, as the awards do", () => {
+    expect(classifyAssignmentFailure(problem("validation-failed", 400, [{ field: "reason", reason: "size" }]))).toEqual({
+      kind: "fields",
+      errors: [{ field: "reason", reason: "cash-reason-length" }],
+    });
+  });
+});
+
+describe("assignmentFailureOf", () => {
+  it("is sure of a definite no and unsure of a network failure and a server failure, with the text of the assignments", () => {
+    const refused = assignmentFailureOf(new ApiFailure(problem("self-approval-forbidden", 403)));
+    expect(refused.outcomeUnknown).toBe(false);
+    expect(refused.failure).toEqual({ kind: "message", key: "scholarships.errors.assignmentSelfApproval", traceId: "t1" });
+    expect(assignmentFailureOf(new ApiFailure({ kind: "network" })).outcomeUnknown).toBe(true);
+    expect(assignmentFailureOf(new ApiFailure(problem("internal-error", 500))).outcomeUnknown).toBe(true);
+    expect(assignmentFailureOf(new Error("boom"))).toEqual({ failure: { kind: "unexpected" }, outcomeUnknown: true });
   });
 });

@@ -5,9 +5,11 @@ import { DEFAULT_PAGE_SIZE } from "../../shared/resource-screen/list-search.ts";
 import { useListSearch } from "../../shared/resource-screen/use-list-search.ts";
 import { AwardDetailContainer } from "./AwardDetailContainer.tsx";
 import { AwardsContainer } from "./AwardsContainer.tsx";
+import { DiscountsContainer } from "./DiscountsContainer.tsx";
 import { ScholarshipsAreaContainer } from "./ScholarshipsAreaContainer.tsx";
 import { ScholarshipsContainer } from "./ScholarshipsContainer.tsx";
-import { SCHOLARSHIPS_PATH, SCHOLARSHIPS_PATHS } from "./scholarships-paths.ts";
+import { discountsSearch, type DiscountsSearch } from "./discounts-search.ts";
+import { DISCOUNT_PATHS, SCHOLARSHIPS_PATH, SCHOLARSHIPS_PATHS } from "./scholarships-paths.ts";
 import {
   awardsSearch,
   scholarshipsSearch,
@@ -23,6 +25,11 @@ export { SCHOLARSHIPS_PATH };
 function ScholarshipsRoute() {
   const [search, onSearchChange] = useListSearch<ScholarshipsSearch>((raw) => scholarshipsSearch.parse(raw));
   return <ScholarshipsContainer search={search} onSearchChange={onSearchChange} />;
+}
+
+function DiscountsRoute() {
+  const [search, onSearchChange] = useListSearch<DiscountsSearch>((raw) => discountsSearch.parse(raw));
+  return <DiscountsContainer search={search} onSearchChange={onSearchChange} />;
 }
 
 function AwardsRoute() {
@@ -65,6 +72,7 @@ export const scholarshipsFeature: FeatureModule = {
   navigation: { id: "scholarships", labelKey: "navigation.scholarships", to: SCHOLARSHIPS_PATHS.list, group: "finance", permission: "scholarships:read" },
   moreNavigation: [
     { id: "scholarships-awards", labelKey: "navigation.awards", to: SCHOLARSHIPS_PATHS.awards, group: "finance", permission: "scholarships:read" },
+    { id: "scholarships-discounts", labelKey: "navigation.discounts", to: DISCOUNT_PATHS.discounts, group: "finance", permission: "scholarships:read" },
     { id: "scholarships-simulator", labelKey: "navigation.simulator", to: SCHOLARSHIPS_PATHS.simulator, group: "finance", permission: "charges:read" },
   ],
   routePermissions: [
@@ -100,6 +108,13 @@ export const scholarshipsFeature: FeatureModule = {
           component: AwardsRoute,
         }),
         createRoute({ getParentRoute: () => area, path: `${below(SCHOLARSHIPS_PATHS.awards)}/$awardId`, component: AwardRoute }),
+        createRoute({
+          getParentRoute: () => area,
+          path: below(DISCOUNT_PATHS.discounts),
+          validateSearch: (raw: Record<string, unknown>) => discountsSearch.parse(raw),
+          search,
+          component: DiscountsRoute,
+        }),
         createRoute({
           getParentRoute: () => area,
           path: below(SCHOLARSHIPS_PATHS.simulator),

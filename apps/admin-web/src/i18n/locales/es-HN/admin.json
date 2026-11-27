@@ -123,7 +123,12 @@
     "scholarshipBenefitLocked": "Esta beca ya tiene otorgamientos aprobados, por lo que su tipo y su valor no se pueden cambiar. Cree otra beca con el nuevo valor y los cargos ya emitidos seguirán explicándose con la beca que tenían.",
     "scholarshipAwardOverlap": "El estudiante ya tiene aprobado un otorgamiento de esta beca con fechas que se cruzan con las de este. Ajuste la vigencia o revoque el otorgamiento anterior.",
     "invalidAwardState": "El otorgamiento ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual.",
-    "scholarshipScopeLocked": "Esta beca ya tiene otorgamientos aprobados: el tope solo puede bajar y los conceptos solo pueden quitarse. Para ampliar la beca, cree otra."
+    "scholarshipScopeLocked": "Esta beca ya tiene otorgamientos aprobados: el tope solo puede bajar y los conceptos solo pueden quitarse. Para ampliar la beca, cree otra.",
+    "duplicateDiscountCode": "Ya existe un descuento con ese código.",
+    "discountBenefitLocked": "Este descuento ya está en uso (tiene asignaciones aprobadas o cargos emitidos), por lo que su tipo y su valor no se pueden cambiar. Cree otro descuento con el nuevo valor y los cargos ya emitidos seguirán explicándose con el descuento que tenían.",
+    "discountScopeLocked": "Este descuento ya está en uso: la vigencia solo puede acortarse y los conceptos solo pueden quitarse. Para ampliarlo, cree otro descuento.",
+    "discountAssignmentOverlap": "El estudiante ya tiene aprobada una asignación de este descuento con fechas que se cruzan con las de esta. Ajuste la vigencia o revoque la asignación anterior.",
+    "invalidDiscountAssignmentState": "La asignación ya no está en el estado que se mostraba, por lo que no admite esta acción. Los datos ya se recargaron: revise su estado actual."
   },
   "field": {
     "required": "Este dato es obligatorio.",
@@ -212,7 +217,9 @@
     "paymentsRegister": "Cobrar",
     "scholarships": "Becas",
     "awards": "Otorgamientos",
-    "simulator": "Simulador de cargos"
+    "simulator": "Simulador de cargos",
+    "discounts": "Descuentos",
+    "discountAssignments": "Asignaciones de convenio"
   },
   "catalog": {
     "title": "Catálogo",
@@ -2298,7 +2305,10 @@
     "errors": {
       "duplicateCode": "Ya existe una beca con ese código.",
       "outsideAcademicYear": "La vigencia debe quedar dentro del año lectivo elegido.",
-      "selfApproval": "Quien solicitó el otorgamiento no puede aprobarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise."
+      "selfApproval": "Quien solicitó el otorgamiento no puede aprobarlo ni rechazarlo. Pida a otra persona con permiso de aprobación que lo revise.",
+      "duplicateDiscountCode": "Ya existe un descuento con ese código.",
+      "assignmentsOutsideValidity": "Hay asignaciones pendientes o aprobadas que quedarían fuera de esta vigencia. Para acortarla, primero revóquelas o recházelas.",
+      "assignmentSelfApproval": "Quien solicitó la asignación no puede aprobarla ni rechazarla. Pida a otra persona con permiso de aprobación que la revise."
     },
     "statuses": {
       "pending": "Pendiente de aprobación",
@@ -2501,6 +2511,141 @@
         "ALREADY_ACCRUED": "Ya generado",
         "ALREADY_ACCRUED_OTHER_PLAN": "Generado por otro plan",
         "ERROR": "Con error: {code}"
+      }
+    },
+    "discounts": {
+      "heading": "Descuentos",
+      "description": "Los descuentos de campaña y de convenio de la institución. Un descuento reduce la base de los cargos que se generen desde entonces; no se borra, se desactiva, y los cargos ya emitidos no cambian.",
+      "caption": "Descuentos de la institución",
+      "loadFailed": "No se pudieron cargar los descuentos",
+      "emptyTitle": "Todavía no hay descuentos",
+      "emptyDescription": "Defina un descuento de campaña o de convenio para que se aplique a los cargos que se generen.",
+      "emptyAction": "Crear un descuento",
+      "create": "Crear descuento",
+      "filterKind": "Clase",
+      "kinds": {
+        "campaign": "Campaña",
+        "agreement": "Convenio"
+      },
+      "stackableYes": "Acumulable",
+      "stackableNo": "No acumulable",
+      "validityValue": "Del {from} al {to}",
+      "columns": {
+        "code": "Código",
+        "name": "Nombre",
+        "kind": "Clase",
+        "benefit": "Beneficio",
+        "validity": "Vigencia",
+        "stackable": "Acumulación",
+        "concepts": "Conceptos que cubre"
+      },
+      "form": {
+        "createTitle": "Crear un descuento",
+        "createDescription": "Defina la clase, el beneficio, la vigencia y los conceptos que cubre. Se aplica a los cargos que se generen dentro de su vigencia.",
+        "editTitle": "Editar el descuento",
+        "editDescription": "El código y la clase no cambian. Mientras el descuento esté en uso, su tipo y su valor no se pueden cambiar.",
+        "code": "Código",
+        "codeHelp": "Letras, números, guion y guion bajo, hasta 30 caracteres. No se puede cambiar después.",
+        "name": "Nombre",
+        "kind": "Clase",
+        "kindHelp": "Un descuento de campaña se aplica solo a todo cargo de los conceptos que cubre. Uno de convenio solo se aplica a los estudiantes con una asignación aprobada.",
+        "inUse": "Este descuento ya está en uso (tiene asignaciones aprobadas o cargos emitidos): su tipo y su valor no se pueden cambiar, la vigencia solo puede acortarse y los conceptos solo pueden quitarse. Para otro valor o un alcance mayor, cree otro descuento.",
+        "validFrom": "Vigente desde",
+        "validTo": "Vigente hasta",
+        "validToHelp": "Este día cuenta como parte de la vigencia.",
+        "stackable": "Acumulable con los demás beneficios",
+        "stackableHelp": "Si todos los beneficios de un cargo son acumulables, se aplican en cascada. Si alguno no lo es, solo se aplica el de mayor beneficio.",
+        "concepts": "Conceptos que cubre",
+        "conceptsHelp": "Elija uno o más. El descuento solo se aplica a los cargos de estos conceptos."
+      }
+    },
+    "assignments": {
+      "heading": "Asignaciones de convenio",
+      "description": "Los descuentos de convenio asignados a cada estudiante. Quien solicita una asignación no puede aprobarla: la decide otra persona, y solo una asignación aprobada y vigente reduce los cargos.",
+      "caption": "Asignaciones de descuentos de convenio",
+      "loadFailed": "No se pudieron cargar las asignaciones",
+      "emptyTitle": "Todavía no hay asignaciones",
+      "emptyDescription": "Cuando se solicite un descuento de convenio para un estudiante aparecerá aquí.",
+      "emptyAction": "Solicitar una asignación",
+      "request": "Solicitar asignación",
+      "filterStatus": "Estado",
+      "filterDiscount": "Descuento",
+      "clearStudent": "Quitar estudiante",
+      "studentUnnamed": "Estudiante elegido",
+      "noValue": "—",
+      "requestedNotice": "Se solicitó la asignación para el estudiante {student}. Queda pendiente hasta que otra persona la apruebe.",
+      "columns": {
+        "requestedAt": "Solicitada",
+        "student": "Estudiante",
+        "discount": "Descuento",
+        "validFrom": "Vigente desde",
+        "validTo": "Vigente hasta",
+        "status": "Estado"
+      },
+      "form": {
+        "title": "Solicitar una asignación",
+        "description": "Elija al estudiante, el descuento de convenio y la vigencia. La asignación nace pendiente y otra persona la aprueba.",
+        "submit": "Solicitar asignación",
+        "sending": "Enviando la solicitud.",
+        "noDiscounts": "No hay descuentos de convenio activos. Cree o active uno para poder solicitar su asignación.",
+        "discount": "Descuento de convenio",
+        "discountHelp": "Solo se ofrecen los descuentos de convenio activos: los de campaña se aplican solos.",
+        "validFrom": "Vigente desde",
+        "validTo": "Vigente hasta",
+        "validToHelp": "Este día cuenta como parte de la vigencia. Debe quedar dentro de la vigencia del descuento.",
+        "pendingNote": "El descuento solo se aplica a los cargos que se generen después de aprobar la asignación y dentro de su vigencia. Los cargos ya emitidos no cambian."
+      },
+      "detail": {
+        "heading": "Asignación del estudiante {student}",
+        "back": "Volver a las asignaciones",
+        "loading": "Cargando la asignación.",
+        "loadFailed": "No se pudo cargar la asignación",
+        "notFoundTitle": "No se encontró la asignación",
+        "notFoundDescription": "No existe o no pertenece a esta institución. Vuelva a la lista de asignaciones.",
+        "forbiddenTitle": "No tiene acceso a esta asignación",
+        "forbiddenDescription": "Su rol no incluye el permiso para ver las asignaciones de descuentos. Si lo necesita para su trabajo, solicítelo a un administrador.",
+        "viewStudentAssignments": "Ver asignaciones del estudiante",
+        "approve": "Aprobar",
+        "reject": "Rechazar",
+        "revoke": "Revocar",
+        "pendingNote": "Esta asignación está pendiente de aprobación y todavía no cambia ningún cargo. La debe decidir una persona distinta de quien la solicitó.",
+        "revokedNote": "Esta asignación fue revocada. Solo afecta los cargos que se generen desde entonces: los ya emitidos no cambian.",
+        "summaryHeading": "Resumen",
+        "decisionHeading": "Decisión",
+        "noValue": "—",
+        "validityValue": "Del {from} al {to}",
+        "fields": {
+          "student": "Estudiante",
+          "discount": "Descuento",
+          "validity": "Vigencia",
+          "requestedAt": "Solicitada",
+          "decision": "Decisión",
+          "decidedAt": "Fecha de la decisión",
+          "reason": "Motivo"
+        }
+      },
+      "approve": {
+        "title": "Aprobar la asignación",
+        "description": "Desde la aprobación, el descuento se aplica a los cargos del estudiante que se generen dentro de su vigencia. Los cargos ya emitidos no cambian. La decisión queda registrada.",
+        "submit": "Aprobar asignación",
+        "sending": "Aprobando la asignación.",
+        "approvedNotice": "La asignación quedó aprobada. Se aplicará a los cargos que se generen dentro de su vigencia."
+      },
+      "reject": {
+        "title": "Rechazar la asignación",
+        "description": "El rechazo no cambia ningún cargo. Queda registrado y no se puede deshacer.",
+        "reason": "Motivo del rechazo",
+        "submit": "Rechazar asignación",
+        "sending": "Rechazando la asignación.",
+        "rejectedNotice": "La asignación quedó rechazada. Ningún cargo cambió."
+      },
+      "revoke": {
+        "title": "Revocar la asignación",
+        "description": "La revocación solo afecta los cargos que se generen desde ahora: los ya emitidos no cambian. Queda registrada y no se puede deshacer.",
+        "reason": "Motivo de la revocación",
+        "submit": "Revocar asignación",
+        "sending": "Revocando la asignación.",
+        "revokedNotice": "La asignación quedó revocada. Solo afecta los cargos que se generen desde ahora."
       }
     }
   },

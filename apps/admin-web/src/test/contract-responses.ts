@@ -1,12 +1,18 @@
 import { randomBytes } from "node:crypto";
 import {
+  AssignmentPageResponse,
+  AssignmentResponse,
   AwardPageResponse,
   AwardResponse,
   ChargeSimulationResponse,
+  DiscountPageResponse,
+  DiscountResponse,
   ScholarshipPageResponse,
   ScholarshipResponse,
+  type AssignmentResponseOutput,
   type AwardResponseOutput,
   type ChargeSimulationResponseOutput,
+  type DiscountResponseOutput,
   type ScholarshipResponseOutput,
 } from "@confia/contracts/admin";
 import { PERMISSION_CODES } from "../shared/permissions/permission-codes.ts";
@@ -1383,6 +1389,72 @@ export function awardPage(
   paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
 ): ContractResponse {
   const body = checked("awards page", AwardPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+// The discounts cut (scholarships-discounts): the discounts and their agreement assignments, checked against the generated contract.
+
+/** One discount as the API answers it: a campaign one of 10 % that stacks and covers the tuition, not in use. */
+export function discount(override: Partial<DiscountResponseOutput> = {}): DiscountResponseOutput {
+  return checked("DiscountResponse", DiscountResponse, {
+    id: crypto.randomUUID(),
+    code: "CAMP10",
+    name: "Campaña de matrícula",
+    kind: "campaign",
+    benefitType: "PERCENTAGE",
+    percent: "10.00",
+    validFrom: "2027-01-01",
+    validTo: "2027-12-31",
+    stackable: true,
+    concepts: [{ id: "00000000-0000-4000-8000-000000007001", code: "MENS", name: "Mensualidad" }],
+    active: true,
+    inUse: false,
+    version: 0,
+    createdAt: STAMP,
+    updatedAt: STAMP,
+    ...override,
+  });
+}
+
+export function discountRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("discount record", DiscountResponse, row), contentType: JSON_TYPE };
+}
+
+export function discountPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("discounts page", DiscountPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
+  return { status: 200, body, contentType: JSON_TYPE };
+}
+
+/** One agreement assignment as the API answers it: pending, for a student and an agreement discount. */
+export function assignment(override: Partial<AssignmentResponseOutput> = {}): AssignmentResponseOutput {
+  return checked("AssignmentResponse", AssignmentResponse, {
+    id: crypto.randomUUID(),
+    studentId: "00000000-0000-4000-8000-0000000000b1",
+    studentCode: "EST-0001",
+    discountId: "00000000-0000-4000-8000-0000000e0101",
+    discountCode: "CONV20",
+    discountName: "Convenio con la empresa",
+    validFrom: "2027-01-01",
+    validTo: "2027-12-31",
+    status: "pending",
+    requestedAt: STAMP,
+    requestedBy: "00000000-0000-4000-8000-0000000000a1",
+    ...override,
+  });
+}
+
+export function assignmentRecord(row: unknown, status: 200 | 201 = 200): ContractResponse {
+  return { status, body: checked("assignment record", AssignmentResponse, row), contentType: JSON_TYPE };
+}
+
+export function assignmentPage(
+  items: readonly unknown[],
+  paging: { readonly page?: number; readonly size?: number; readonly total?: number } = {},
+): ContractResponse {
+  const body = checked("assignments page", AssignmentPageResponse, { items, page: paging.page ?? 0, size: paging.size ?? 25, total: paging.total ?? items.length });
   return { status: 200, body, contentType: JSON_TYPE };
 }
 
