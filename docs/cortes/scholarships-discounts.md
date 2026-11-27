@@ -195,3 +195,37 @@ estudiante muestran la lista de beneficios aplicados. Queda T3 (contrato en `pac
 - `IntegrityCheck` no compara las líneas; el asiento sigue comparándose contra total más beneficio.
 - Los constructores de `ManageAccrual`, `ExecuteAccrualRun` y `SimulateCharges` sin descuentos se conservan (`PaymentsFixture` los usa); los procesos reales
   usan los nuevos, que reciben `DiscountBenefits`.
+
+## Lo construido (frontend T3, 2026-11-26)
+
+`packages/contracts` se regeneró con `pnpm --filter @confia/contracts generate` (el directorio generado está fuera de Git, así que no hay archivo que
+confirmar). Las pantallas viven en `apps/admin-web/src/features/scholarships/`, bajo el área «Becas», y reutilizan los patrones del corte 1.
+
+- **Beneficios aplicados en los cargos.** El componente de presentación `BenefitList` (`shared/benefits/components/`) lista cada beneficio de un cargo en el
+  orden que lo aplicó el servidor (origen «Beca» o «Descuento», código copiado e importe tal como llegó, con `MoneyAmount`), o dice «Sin beneficios». Sustituye
+  la columna «Beca» en la vista previa de la generación de cargos, en el simulador y en los cargos del estudiante. El navegador no suma, no redondea ni compara
+  importes: el beneficio total, la base neta, el impuesto y el total siguen siendo los del servidor. El tipo viene de `@confia/contracts/admin`, no de
+  `shared/api` (regla `admin-presentation-is-pure`).
+- **Descuentos** (`/scholarships/discounts`, entrada «Descuentos»). Lista paginada, filtrada (clase, tipo de beneficio, estado) y ordenada en el servidor, con todo
+  en la dirección. Alta y edición en un diálogo: código y clase (fijos al crear), nombre, tipo y valor (porcentaje o monto fijo), vigencia con ambos días incluidos,
+  marca «Acumulable» (empieza sin marcar) y conceptos. Con `inUse` el tipo y el valor se muestran de solo lectura con la explicación; los rechazos del servidor
+  (`discount-benefit-locked`, `discount-scope-locked`, `duplicate-discount-code` bajo el código y `assignments-outside-validity` bajo el fin de la vigencia) salen
+  del catálogo i18n. Desactivar y reactivar desde la fila, sin borrar.
+- **Asignaciones de convenio** (`/scholarships/discount-assignments` y `/scholarships/discount-assignments/$assignmentId`, entrada «Asignaciones de convenio»).
+  Lista con filtros de estado, descuento y estudiante; solicitud en un diálogo (solo descuentos de convenio activos); detalle con «Aprobar», «Rechazar» y
+  «Revocar», cada una un diálogo explícito. Rechazar y revocar exigen un motivo de 20 a 500 caracteres. Las tres decisiones llevan `Idempotency-Key`, que se
+  conserva mientras el resultado es desconocido (red caída, 5xx) y se renueva tras un rechazo definitivo. `self-approval-forbidden` tiene su propio texto («Quien
+  solicitó la asignación…») y los demás códigos nuevos (`discount-assignment-overlap`, `invalid-discount-assignment-state`) pasan por el clasificador compartido.
+  Nada es optimista: tras confirmar se vuelven a leer las asignaciones y los descuentos (una aprobada pone el descuento «en uso»).
+- **Inventarios.** Rutas de AW59, entradas de la navegación lateral, matriz de accesibilidad (descuentos: listado, vacío, error de carga, alta y edición de uno en
+  uso; asignaciones: listado, vacío, solicitud, detalle pendiente y su diálogo de rechazo) e inventario de recorridos (`scholarships-discounts.e2e.ts` y
+  `scholarships-assignments.e2e.ts`). La API simulada (`e2e/mock-api/discounts-model.ts`) repite solo las reglas que esos recorridos necesitan.
+- **Pruebas.** Vitest con Testing Library y MSW: modelo del formulario, vistas, diálogos y contenedores de descuentos y asignaciones (incluidos el vacío, el error con
+  reintento, los campos bloqueados, el rechazo de la autoaprobación, la longitud del motivo y la reutilización de la `Idempotency-Key`); Playwright con axe para los
+  tres recorridos de becas y las combinaciones nuevas de la matriz.
+
+### Desviaciones y pendientes
+
+- El simulador de la API simulada (solo para Playwright) no aplica descuentos: la cascada se prueba en el backend. Los recorridos de Playwright no muestran un
+  cargo con descuento.
+- No hay todavía una pantalla de reportes de costo de descuentos (fuera de alcance de este corte).
