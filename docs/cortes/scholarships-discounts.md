@@ -16,15 +16,46 @@ beneficios. El descuento por pronto pago llega después, junto a pagos. Se apoya
     monto fijo mayor que 0, ambos con hasta dos decimales), conceptos que cubre (uno o más), vigencia (`validFrom`, `validTo`) y la marca
     `stackable` (acumulable).
   - Se desactiva y se reactiva; no se borra. Desactivarlo no cambia los cargos emitidos (docs/ui-ux/04, mensajes).
-  - Con cargos emitidos o asignaciones aprobadas, el tipo y el valor no cambian, y el alcance solo se reduce (conceptos que se quitan,
+  - Con cargos emitidos o asignaciones aprobadas, el tipo, el valor y la marca acumulable no cambian, y el alcance solo se reduce (conceptos que se quitan,
     vigencia que se acorta), igual que una beca: ampliar significa crear otro descuento.
 - **Clases de descuento:**
-  - **Campaña:** se aplica solo, a todo cargo de un concepto cubierto cuya fecha de emisión cae en la vigencia. No se asigna a nadie.
+  - **Campaña:** se aplica solo, a todo cargo de un concepto cubierto cuya fecha de precio (la fecha con que se fija el precio del cargo, no la de emisión) cae en la
+    vigencia, con ambos extremos incluidos. No se asigna a nadie. Aplica solo una vez aprobada por otra persona (ver «Aprobación de un descuento de
+    campaña»).
   - **Convenio:** se aplica solo a los estudiantes con una asignación aprobada y vigente (decisión del propietario, 2026-11-26, «Con
     aprobación»). La asignación (`DiscountAssignment`) sigue el mismo ciclo que el otorgamiento de beca: nace `pending`, pasa a
     `approved` o `rejected`, y una aprobada puede pasar a `revoked`. Quien la solicita no puede decidirla (`403 self-approval-forbidden`).
     Rechazo y revocación exigen un motivo de 20 a 500 caracteres; la bitácora guarda su huella SHA-256 y su longitud. Su vigencia cae
     dentro de la del descuento, y un estudiante no tiene dos asignaciones aprobadas del mismo descuento que se solapen.
+- **Aprobación de un descuento de campaña** (decisión del propietario, 2026-11-26, «Aprobación por otra persona», cierra el hallazgo H1 de
+  la revisión de seguridad): un descuento de campaña se aplica solo a todo cargo, así que ninguna persona lo deja vigente sola.
+  - Crear un descuento de campaña lo deja `pending` (sin aplicarse) hasta que otra persona con `scholarships:approve` lo aprueba; si lo
+    rechaza (motivo de 20 a 500 caracteres) queda `rejected` y nunca se aplica ni se edita.
+  - **Ampliarlo** (otro tipo de beneficio o un valor mayor, una vigencia que empieza antes o termina después, un concepto más, la marca
+    acumulable activada) y **reactivarlo** no cambian los términos vigentes: dejan una **propuesta** (`pendingChange`) que otra persona
+    aprueba (pasa a ser los términos vigentes) o rechaza (se descarta). Una propuesta a la vez; mientras espera, el descuento no se
+    edita ni se reactiva, y solo se puede desactivar. **Reducirlo** (valor menor, vigencia más corta, menos conceptos, acumulable
+    apagado) y **desactivarlo** siguen siendo inmediatos. Ampliar uno ya en uso sigue siendo 409 (se crea otro descuento).
+  - Solo los términos aprobados se aplican en el devengo (`DiscountBenefits.inForce` filtra `approval_status = approved`) y la base
+    rechaza la línea de un cargo para un descuento que no está aprobado.
+  - **Modelo mínimo.** La propuesta vive en las columnas `pending_*` del mismo renglón del descuento (los términos vigentes son las columnas
+    de siempre); la decisión es un registro de solo inserción, `scholarships_discount_change_decision`, con la versión del descuento que el
+    aprobador vio, la `Idempotency-Key` permanente con la huella de lo pedido y, al rechazar, el motivo (en la bitácora solo su SHA-256 y su
+    longitud). Cada cambio de estado sube la versión del descuento; la decisión nombra la versión (`409 stale-version` si cambió). La
+    base impide, también al dueño: nacer un descuento de campaña aprobado, ampliarlo o reactivarlo sin una decisión de otra persona
+    tomada en la misma transacción y con exactamente los términos propuestos, una propuesta a nombre de otra cuenta, cambiar uno
+    pendiente o rechazado, y agregar un concepto fuera de su nacimiento o de una aprobación. Quien creó el descuento o propuso el
+    cambio no lo decide (`403 self-approval-forbidden`, en el servidor y en la base).
+  - **Descuento de convenio:** crearlo, editarlo y reactivarlo sigue siendo inmediato, porque no se aplica a nadie sin una asignación
+    aprobada, que ya lleva su segunda persona (ver abajo).
+- **La aprobación de una asignación queda ligada a lo solicitado** (hallazgo H2): la asignación guarda la versión del descuento y su
+  beneficio (tipo y valor) al solicitarla, y el detalle los muestra (`discountVersion`, `benefitType`, `percent`, `fixedAmount`). Aprobarla
+  exige que el descuento tenga todavía esa versión: si cambió después de la solicitud (cualquier edición, incluso el nombre, una
+  desactivación o una reactivación) responde `409 discount-terms-changed` y no se escribe nada; rechazar no exige términos. La base lo
+  exige igual y que quien solicita sea la cuenta de la sesión. Una asignación de antes de esta regla no guarda términos y ya no se puede
+  aprobar: se solicita otra vez. La bitácora de la solicitud y de la aprobación lleva la versión y el beneficio.
+- **La marca `stackable` queda bloqueada en uso** (decisión del propietario, 2026-11-26, «Bloquearla en uso»): como el tipo y el valor,
+  no cambia cuando el descuento tiene una asignación aprobada o un cargo emitido (`409 discount-benefit-locked`; también la base).
 - **Regla de acumulación (INV-15)** (decisión del propietario, 2026-11-26, «En cascada»):
   - Si todos los beneficios que aplican a un cargo son acumulables, se aplican **en cascada**: primero la beca sobre la base bruta,
     después cada descuento sobre lo que queda. Ejemplo: base 1,000.00, beca 20 % y descuento 10 %: 1,000.00 → 800.00 → 720.00.
@@ -52,6 +83,8 @@ rechaza, y `scholarships:void` revoca.
 ## Endpoints (`/api/v1/scholarships`)
 
 - Descuentos: `GET` y `POST /discounts`, `GET` y `PUT /discounts/{id}`, y `POST /discounts/{id}/deactivate|reactivate`.
+  Decisiones sobre un descuento de campaña: `POST /discounts/{id}/approve` (cuerpo `{ version }`) y `POST /discounts/{id}/reject` (cuerpo
+  `{ version, reason }`), con `Idempotency-Key` y el permiso `scholarships:approve`.
 - Asignaciones: `GET /discount-assignments?studentId&status&discountId&page&size&sort`, `POST /discount-assignments`,
   `GET /discount-assignments/{id}` y `POST /discount-assignments/{id}/approve|reject|revoke`, con `Idempotency-Key`.
 - La vista previa, los cargos del estudiante y el simulador agregan la lista de beneficios aplicados por cargo.
@@ -67,9 +100,12 @@ rechaza, y `scholarships:void` revoca.
 - Beca y descuento acumulables (cascada), uno no acumulable (solo el mayor) y empate.
 - Dos descuentos acumulables, uno de porcentaje y uno de monto fijo (orden de la cascada).
 - Beneficios que sumarían más que la base (queda en cero).
-- Descuento de campaña que empieza o termina el día de emisión (incluido); concepto no cubierto.
+- Descuento de campaña que empieza o termina el día de la fecha de precio (incluido); concepto no cubierto.
 - Convenio sin asignación, pendiente, rechazada o revocada (no se aplica); aprobación de quien la solicitó.
 - Ampliar el alcance o cambiar el valor de un descuento ya usado (409); reducirlo (permitido).
+- Descuento de campaña pendiente, rechazado o con una propuesta esperando (no se aplica o se aplica con los términos vigentes); decisión de
+  quien lo creó o lo propuso (403); versión desactualizada (409); editar o reactivar mientras espera (409 `discount-pending-approval`).
+- Cambiar el descuento entre la solicitud y la aprobación de una asignación (409 `discount-terms-changed`).
 - Redondeo `HALF_UP` en cada paso; concepto gravado (impuesto sobre la base neta).
 - Otra institución (404) y RLS.
 
@@ -128,13 +164,13 @@ rechaza, y `scholarships:void` revoca.
 - **Regla añadida:** acortar la vigencia de un descuento que dejaría fuera una asignación pendiente o aprobada se rechaza (`400 validation-failed`,
   campo `validTo`, motivo `assignments-outside-validity`); así la vigencia de la asignación siempre queda dentro de la del descuento. Aprobar
   vuelve a comprobar esa inclusión. La nota no lo decía; para acortar, primero se revoca o rechaza la asignación.
-- Cambiar la marca `stackable` se permite aunque el descuento esté en uso (la nota solo bloquea tipo, valor y alcance); solo afecta a los cargos
-  que se emitan después.
+- ~~Cambiar la marca `stackable` se permite aunque el descuento esté en uso~~: corregido en T4 (S8): la marca queda bloqueada en uso, como el
+  tipo y el valor (ver «Lo construido (backend T4)»).
 - Cinco códigos de problema nuevos: `duplicate-discount-code`, `discount-benefit-locked`, `discount-scope-locked`,
   `discount-assignment-overlap` e `invalid-discount-assignment-state`. La autoaprobación reutiliza `self-approval-forbidden` (403).
 - Pendiente de T2 (hecho en T2, ver «Lo construido (backend T2)»): cascada, detalle por beneficio en el cargo, asiento, vista previa, cargos del estudiante y simulador; ampliar «en uso» con los
-  cargos emitidos. Pendiente de T3: `packages/contracts` y pantallas. `docs/03-seguridad.md` §5.3 no se actualizó con la segregación de las
-  asignaciones de convenio.
+  cargos emitidos. Pendiente de T3: `packages/contracts` y pantallas. `docs/03-seguridad.md` §5.3 se actualizó en T4 con la segregación de las
+  asignaciones de convenio y de los descuentos de campaña.
 
 ## Lo construido (backend T2, 2026-11-26)
 
@@ -175,8 +211,8 @@ estudiante muestran la lista de beneficios aplicados. Queda T3 (contrato en `pac
   líneas muestra su beca como único beneficio. `admin.openapi.json` regenerado (un esquema nuevo, `AppliedBenefit`, y el campo `benefits`; sin
   operaciones nuevas); `packages/contracts` no se regeneró (T3).
 - **Pruebas nuevas.** Dominio: `BenefitStackingTest` (15) y `ChargeEvaluatorDiscountsTest` (5). Base real: `AccrualDiscountsIT` (38: el ejemplo de
-  aceptación con su asiento, el caso no acumulable, orden de la cascada, suma mayor que la base, empates, campaña que empieza o termina el día de
-  emisión, concepto no cubierto, convenio sin asignación, pendiente, rechazada, revocada y aprobada, `HALF_UP` por paso, tope con descuento,
+  aceptación con su asiento, el caso no acumulable, orden de la cascada, suma mayor que la base, empates, campaña que empieza o termina el día de la fecha de
+  precio, concepto no cubierto, convenio sin asignación, pendiente, rechazada, revocada y aprobada, `HALF_UP` por paso, tope con descuento,
   cambio entre vista previa y confirmación, repetir el período, simulador igual al motor, «en uso» y lo que rechaza la base) y
   `ChargeBenefitsMigrationIT` (2: una base migrada de V39 a V40 con cargos del corte 1 los deja intactos y se leen igual).
 
@@ -229,3 +265,59 @@ confirmar). Las pantallas viven en `apps/admin-web/src/features/scholarships/`, 
 - El simulador de la API simulada (solo para Playwright) no aplica descuentos: la cascada se prueba en el backend. Los recorridos de Playwright no muestran un
   cargo con descuento.
 - No hay todavía una pantalla de reportes de costo de descuentos (fuera de alcance de este corte).
+
+## Lo construido (backend T4, correcciones de las revisiones, 2026-11-26)
+
+Cierra los hallazgos de la revisión de seguridad (H1, H2, M1, L1, L3) y las observaciones de la revisión de código (F1 a F7). Migración
+`V41__require_approval_of_campaign_discounts_and_bind_assignments_to_terms.sql` (agrega y reemplaza funciones con `CREATE OR REPLACE`; no
+actualiza ni borra ninguna fila; V39 y V40 no se tocan porque las bases locales ya las aplicaron).
+
+- **S7 / H1, aprobación de un descuento de campaña.** Ver «Aprobación de un descuento de campaña» arriba. Código: `Discount` (`approval`,
+  `proposal`), `DiscountProposal`, `DiscountDecision`, `DecideDiscountChange` (aprobar y rechazar, con `Idempotency-Key` y versión),
+  `ManageDiscounts` (una ampliación o una reactivación de campaña deja la propuesta), `JooqDiscountDecisionRepository`. La bitácora agrega
+  `scholarships.discount.change_requested`, `scholarships.discount.approved` (con el aprobador) y `scholarships.discount.rejected` (con la
+  huella del motivo); `created` lleva `approvalStatus`.
+- **H2, aprobación ligada a los términos.** `scholarships_discount_assignment` agrega `discount_version`, `benefit_type`, `percent` y
+  `fixed_amount`; `DiscountAssignment.requireTermsOf` y `DecideDiscountAssignment` rechazan con `409 discount-terms-changed`; el disparador de la
+  asignación lo exige también (al nacer con los términos de hoy, al aprobar con la versión solicitada, y los términos nunca cambian). El
+  detalle y la bitácora de la solicitud y de la aprobación llevan la versión y el beneficio.
+- **S8 / F3, `stackable` bloqueada en uso**: dominio (`Discount.edit`), caso de uso y disparador; reutiliza `discount-benefit-locked`.
+- **M1 / F1**: `charges_charge_benefit_before_insert` rechaza una línea cuyo cargo no se escribió en la misma transacción (la del asiento
+  `ledger_transaction.posting_xid`, la técnica de `charges_charge_before_insert`); cierra el caso de un cargo de antes de las líneas.
+- **L1**: el disparador de la asignación de descuento y el del otorgamiento de beca exigen `requested_by = app.actor_id` al nacer.
+- **Pruebas nuevas o cambiadas.** `CampaignApprovalIT` (nuevo), `DiscountTest`, `DiscountAssignmentTest`, `DiscountsIT` (H2, L1, S8 en la base,
+  L3), `ScholarshipsIT` (L1 del otorgamiento), `DiscountsEndpointsIT` (rutas de decisión, 403, 409, cuerpo y clave), `AccrualDiscountsIT`
+  (descuento pendiente o rechazado, propuesta que no cambia lo que aplica, F4 con el rol de la aplicación, F5 con un disparador de prueba
+  que pierde una línea y el rechazo al confirmar), `ChargeBenefitsMigrationIT` (M1). Los ITs que crean campañas las aprueban con otra
+  persona (`approvedByAnother`). Pruebas de dominio para cubrir las ramas que ya existían sin prueba directa: `DiscountInvariantsTest`,
+  `AppliedBenefitTest` y `DiscountCandidateTest`.
+- **Verificación.** `./mvnw verify` completo en `apps/api`: núcleo 205, unitarias 4841 (3 omitidas que ya lo estaban), integración 1870, sin
+  fallos (incluidas `DecidePaymentIT`, `RegisterPaymentIT` y `PaymentEndpointsIT`), y la compuerta de JaCoCo cumplida (ramas de
+  `scholarships.domain` 98 %, de `charges.domain` 96 %; una primera corrida solo falló esa compuerta, con 91 % y 94 %, y se corrigió con
+  pruebas y no con un umbral menor).
+
+### Lo que debe cambiar el frontend (T4, segunda parte)
+
+- Respuesta de descuento (`DiscountResponse`, también en la lista): campos nuevos `approvalStatus` (`pending`|`approved`|`rejected`),
+  `createdBy` y `pendingChange` (ausente si no espera nada: `name`, `benefitType`, `percent`, `fixedAmount`, `validFrom`, `validTo`,
+  `stackable`, `reactivate`, `concepts`, `requestedBy`, `requestedAt`). Los campos de siempre son los términos vigentes.
+- Rutas nuevas: `POST /api/v1/scholarships/discounts/{id}/approve` (`{ version }`) y `.../reject` (`{ version, reason }`, 20 a 500
+  caracteres), con `Idempotency-Key` (conservarla mientras el resultado es desconocido) y permiso `scholarships:approve`.
+- Estados que mostrar: «Pendiente de aprobación» (crear una campaña responde 201 con `approvalStatus: pending`), «Propuesta pendiente»
+  (editar una ampliación o reactivar una campaña responde 200 con `pendingChange`, y el formulario muestra los términos vigentes y los
+  propuestos), «Rechazado». Con `approvalStatus != approved` o `pendingChange` presente no se puede editar ni reactivar (`409
+  discount-pending-approval`); sí se puede desactivar. El botón «Aprobar» y «Rechazar» se oculta o se deshabilita para `createdBy` (si está
+  pendiente de creación) o `pendingChange.requestedBy`; el servidor responde `403 self-approval-forbidden`.
+- Códigos de problema nuevos (`ProblemCode` y `problems.properties`): `discount-pending-approval`, `invalid-discount-change-state`,
+  `discount-terms-changed` (409 los tres). `discount-benefit-locked` ahora también cubre la marca acumulable: el campo «Acumulable» queda de solo
+  lectura cuando `inUse`.
+- Detalle de asignación (`AssignmentResponse`): campos nuevos `discountVersion`, `benefitType`, `percent`, `fixedAmount` (lo solicitado);
+  aprobar puede responder `409 discount-terms-changed` (mensaje: solicitar la asignación otra vez).
+
+### Desviaciones y pendientes
+
+- Una asignación creada antes de V41 no guarda términos y no se puede aprobar (`discount-terms-changed`); se solicita otra vez. Una campaña que
+  ya existía en una base local queda `approved` (V41 no la reabre).
+- Un descuento de campaña rechazado conserva su código (no se reutiliza) y nunca se edita; se crea otro.
+- Reactivar un descuento de convenio y desactivar y reactivar un descuento con asignaciones pendientes sube su versión: esas asignaciones se
+  rechazan o se solicitan otra vez antes de aprobarse.

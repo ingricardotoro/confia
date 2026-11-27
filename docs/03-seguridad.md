@@ -895,6 +895,29 @@ segregación de funciones no debe listar ningún usuario con ambos permisos del 
 > solo hacia adelante (un cargo emitido no cambia) y que revocar solo quita un beneficio. La tabla de arriba no cambia. Revisar si se
 > introducen becas de monto alto.
 
+> **Nota fechada 2026-11-26 (corte `scholarships-discounts`, F2): segregación de funciones en las asignaciones de convenio y en los
+> descuentos de campaña.** La tabla de arriba no cambia (sigue en ocho operaciones); estas dos operaciones sí exigen una segunda persona y el
+> sistema la hace cumplir en el servidor y en la base de datos (`403 self-approval-forbidden`; la decisión es un registro de solo inserción con
+> la `Idempotency-Key` guardada de forma permanente y, al rechazar, un motivo de 20 a 500 caracteres cuya huella SHA-256 y longitud van a la
+> bitácora, nunca su texto). `scholarships:create` inicia y `scholarships:approve` decide.
+> - **Asignación de un descuento de convenio a un estudiante** (decisión del propietario, 2026-11-26, «Con aprobación»): quien la solicita no
+>   la aprueba ni la rechaza. Revocar una asignación aprobada no exige segunda persona (mismo criterio que la revocación de un otorgamiento,
+>   nota de 2026-11-24). La aprobación queda ligada a lo solicitado: la asignación guarda la versión del descuento y su beneficio (tipo y
+>   valor) al solicitarla, el aprobador los ve en el detalle, y la aprobación se rechaza con `409 discount-terms-changed` si el descuento
+>   cambió después de la solicitud, de modo que quien solicita no puede editar el descuento entre la solicitud y la aprobación y obtener
+>   aprobado algo distinto de lo que se mostró. La base de datos exige lo mismo y que el solicitante sea la cuenta de la sesión.
+> - **Descuento de campaña** (decisión del propietario, 2026-11-26, «Aprobación por otra persona»; cierra el hallazgo H1 de la revisión de
+>   seguridad): un descuento de campaña se aplica solo a todo cargo de un concepto cubierto, así que nace `pending` y no se aplica hasta que
+>   otra persona con `scholarships:approve` lo aprueba. Ampliarlo (otro tipo de beneficio o un valor mayor, una vigencia que empieza antes o
+>   termina después, un concepto más, la marca acumulable activada) y reactivarlo dejan una propuesta que otra persona aprueba o rechaza; los
+>   términos vigentes no cambian mientras espera, y la decisión nombra la versión que el aprobador vio (`409 stale-version` si cambió).
+>   Reducirlo y desactivarlo siguen siendo inmediatos. El descuento de convenio no necesita esta aprobación porque solo se aplica mediante
+>   una asignación aprobada, que ya lleva su segunda persona. En el uso, el tipo, el valor y la marca acumulable de un descuento no cambian
+>   (`409 discount-benefit-locked`).
+>
+> Pruebas: `CampaignApprovalIT`, `DiscountsIT` y `DiscountsEndpointsIT` (el mismo actor intenta iniciar y aprobar, y el sistema responde 403;
+> la base rechaza lo mismo con SQL directo). Pendiente, como en las demás filas: la caducidad de lo pendiente (ver la brecha siguiente).
+
 > **Brecha de control registrada 2026-11-24 (corte `scholarships-awards`, F2): las aprobaciones pendientes no caducan.** El párrafo de
 > implementación de esta sección dice que una aprobación caduca a las 72 horas sin resolución y notifica. Hoy no existe esa caducidad ni en
 > `scholarships` (otorgamientos `pending`) ni en `payments` (transferencias por confirmar): una solicitud pendiente sigue vigente
