@@ -1,6 +1,7 @@
 package com.confia.charges.infrastructure;
 
 import static confia.generated.jooq.tables.ChargesCharge.CHARGES_CHARGE;
+import static confia.generated.jooq.tables.ChargesChargeBenefit.CHARGES_CHARGE_BENEFIT;
 import static confia.generated.jooq.tables.ChargesChargeVoid.CHARGES_CHARGE_VOID;
 
 import com.confia.charges.application.ChargeFilter;
@@ -8,6 +9,7 @@ import com.confia.charges.application.ChargeRepository;
 import com.confia.charges.application.ChargeRow;
 import com.confia.charges.application.Page;
 import com.confia.charges.application.PageRequest;
+import com.confia.charges.domain.AppliedBenefit;
 import com.confia.charges.domain.ChargeStatus;
 import com.confia.charges.domain.IntegrityCheck;
 import com.confia.charges.domain.ComputedCharge;
@@ -60,18 +62,34 @@ public final class JooqChargeRepository implements ChargeRepository {
 
     @Override
     public Money benefitGiven(InstitutionId institution, UUID awardId, LocalDate periodStart) {
-        Record row = dsl.select(DSL.sum(CHARGES_CHARGE.DISCOUNT_AMOUNT), DSL.min(CHARGES_CHARGE.DISCOUNT_CURRENCY))
-                .from(CHARGES_CHARGE)
-                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
-                .and(CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID.eq(awardId))
+        // The scholarship lines of the charges that were not voided...
+        BigDecimal lines = dsl.select(DSL.sum(CHARGES_CHARGE_BENEFIT.AMOUNT))
+                .from(CHARGES_CHARGE_BENEFIT).join(CHARGES_CHARGE)
+                .on(CHARGES_CHARGE.INSTITUTION_ID.eq(CHARGES_CHARGE_BENEFIT.INSTITUTION_ID))
+                .and(CHARGES_CHARGE.ID.eq(CHARGES_CHARGE_BENEFIT.CHARGE_ID))
+                .where(CHARGES_CHARGE_BENEFIT.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE_BENEFIT.SCHOLARSHIP_AWARD_ID.eq(awardId))
                 .and(CHARGES_CHARGE.PERIOD_START.eq(periodStart))
                 .andNotExists(dsl.selectOne().from(CHARGES_CHARGE_VOID)
                         .where(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
                         .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID)))
-                .fetchOne();
-        BigDecimal sum = row.get(0, BigDecimal.class);
-        String currency = row.get(1, String.class);
-        return sum == null ? Money.zero(CurrencyCode.HNL) : MoneyColumns.toMoney(sum, currency);
+                .fetchOne(0, BigDecimal.class);
+        // ...and, for a charge from before the lines existed (it has none), its whole benefit, which was the scholarship's.
+        BigDecimal legacy = dsl.select(DSL.sum(CHARGES_CHARGE.DISCOUNT_AMOUNT))
+                .from(CHARGES_CHARGE)
+                .where(CHARGES_CHARGE.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID.eq(awardId))
+                .and(CHARGES_CHARGE.PERIOD_START.eq(periodStart))
+                .andNotExists(dsl.selectOne().from(CHARGES_CHARGE_BENEFIT)
+                        .where(CHARGES_CHARGE_BENEFIT.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                        .and(CHARGES_CHARGE_BENEFIT.CHARGE_ID.eq(CHARGES_CHARGE.ID)))
+                .andNotExists(dsl.selectOne().from(CHARGES_CHARGE_VOID)
+                        .where(CHARGES_CHARGE_VOID.INSTITUTION_ID.eq(CHARGES_CHARGE.INSTITUTION_ID))
+                        .and(CHARGES_CHARGE_VOID.CHARGE_ID.eq(CHARGES_CHARGE.ID)))
+                .fetchOne(0, BigDecimal.class);
+        BigDecimal sum = (lines == null ? BigDecimal.ZERO : lines).add(legacy == null ? BigDecimal.ZERO : legacy);
+        // The scholarships are in HNL: so are their lines, and a charge that carries one is in HNL.
+        return MoneyColumns.toMoney(sum, CurrencyCode.HNL.name());
     }
 
     @Override
@@ -112,6 +130,54 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .set(CHARGES_CHARGE.LEDGER_TRANSACTION_ID, ledgerTransactionId)
                 .set(CHARGES_CHARGE.CREATED_BY, createdBy)
                 .execute();
+        insertBenefits(institution, chargeId, charge);
+    }
+
+    /** One line per benefit, in the order the engine applied them; the database checks each line and that they add up to the benefit. */
+    private void insertBenefits(InstitutionId institution, UUID chargeId, ComputedCharge charge) {
+        short position = 1;
+        for (AppliedBenefit benefit : charge.benefits()) {
+            dsl.insertInto(CHARGES_CHARGE_BENEFIT)
+                    .set(CHARGES_CHARGE_BENEFIT.INSTITUTION_ID, institution.value())
+                    .set(CHARGES_CHARGE_BENEFIT.CHARGE_ID, chargeId)
+                    .set(CHARGES_CHARGE_BENEFIT.POSITION, position++)
+                    .set(CHARGES_CHARGE_BENEFIT.SOURCE, benefit.source().name())
+                    .set(CHARGES_CHARGE_BENEFIT.SCHOLARSHIP_AWARD_ID, benefit.awardId())
+                    .set(CHARGES_CHARGE_BENEFIT.SCHOLARSHIP_CODE, benefit.scholarshipCode())
+                    .set(CHARGES_CHARGE_BENEFIT.DISCOUNT_ID, benefit.discountId())
+                    .set(CHARGES_CHARGE_BENEFIT.DISCOUNT_CODE, benefit.discountCode())
+                    .set(CHARGES_CHARGE_BENEFIT.DISCOUNT_ASSIGNMENT_ID, benefit.assignmentId())
+                    .set(CHARGES_CHARGE_BENEFIT.AMOUNT, MoneyColumns.amountColumn(benefit.amount()))
+                    .set(CHARGES_CHARGE_BENEFIT.CURRENCY, MoneyColumns.currencyColumn(benefit.amount()))
+                    .execute();
+        }
+    }
+
+    /**
+     * The benefits of these charges, by charge, in the order they were applied. A charge from before the lines existed has none: its
+     * scholarship, which was its only benefit, is built from the columns of the charge.
+     */
+    private java.util.Map<UUID, List<AppliedBenefit>> benefitsOf(InstitutionId institution, List<ChargeRow> rows) {
+        java.util.Map<UUID, List<AppliedBenefit>> byCharge = new java.util.HashMap<>();
+        if (rows.isEmpty()) {
+            return byCharge;
+        }
+        dsl.selectFrom(CHARGES_CHARGE_BENEFIT)
+                .where(CHARGES_CHARGE_BENEFIT.INSTITUTION_ID.eq(institution.value()))
+                .and(CHARGES_CHARGE_BENEFIT.CHARGE_ID.in(rows.stream().map(ChargeRow::id).toList()))
+                .orderBy(CHARGES_CHARGE_BENEFIT.CHARGE_ID, CHARGES_CHARGE_BENEFIT.POSITION)
+                .forEach(line -> byCharge.computeIfAbsent(line.getChargeId(), id -> new ArrayList<>())
+                        .add(new AppliedBenefit(AppliedBenefit.Source.valueOf(line.getSource()), line.getScholarshipAwardId(),
+                                line.getScholarshipCode(), line.getDiscountId(), line.getDiscountCode(),
+                                line.getDiscountAssignmentId(),
+                                MoneyColumns.toMoney(line.getAmount(), line.getCurrency()))));
+        for (ChargeRow row : rows) {
+            if (!byCharge.containsKey(row.id()) && row.scholarshipAwardId() != null) {
+                byCharge.put(row.id(), List.of(new AppliedBenefit(AppliedBenefit.Source.SCHOLARSHIP, row.scholarshipAwardId(),
+                        row.scholarshipCode(), null, null, null, row.benefit())));
+            }
+        }
+        return byCharge;
     }
 
     @Override
@@ -215,6 +281,8 @@ public final class JooqChargeRepository implements ChargeRepository {
                 .orderBy(orders(page))
                 .limit(page.size()).offset(page.offset())
                 .fetch(JooqChargeRepository::toRow);
+        java.util.Map<UUID, List<AppliedBenefit>> benefits = benefitsOf(institution, rows);
+        rows = rows.stream().map(row -> row.withBenefits(benefits.getOrDefault(row.id(), List.of()))).toList();
         return new Page<>(rows, total, page.page(), page.size());
     }
 
@@ -256,7 +324,7 @@ public final class JooqChargeRepository implements ChargeRepository {
                 row.get(CHARGES_CHARGE.SCHOLARSHIP_AWARD_ID), row.get(CHARGES_CHARGE.SCHOLARSHIP_CODE),
                 MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TAX_AMOUNT), row.get(CHARGES_CHARGE.TAX_CURRENCY)),
                 MoneyColumns.toMoney(row.get(CHARGES_CHARGE.TOTAL_AMOUNT), row.get(CHARGES_CHARGE.TOTAL_CURRENCY)),
-                voided);
+                voided, List.of());
     }
 
     @Override

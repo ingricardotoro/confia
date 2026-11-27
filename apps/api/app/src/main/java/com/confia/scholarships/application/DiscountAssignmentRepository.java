@@ -36,8 +36,8 @@ public interface DiscountAssignmentRepository {
     void advanceStatus(InstitutionId institution, UUID id, AwardStatus to);
 
     /**
-     * Of these discounts, the ones in use: they have an assignment that was approved (and maybe revoked since). The accrual task adds
-     * the discounts that a charge was issued with.
+     * Of these discounts, the ones in use: they have an assignment that was approved (and maybe revoked since) or a charge was
+     * issued with them.
      */
     Set<UUID> inUse(InstitutionId institution, Collection<UUID> discountIds);
 

@@ -1,6 +1,7 @@
 package com.confia.scholarships.infrastructure;
 
 import static confia.generated.jooq.tables.ScholarshipsDiscountAssignment.SCHOLARSHIPS_DISCOUNT_ASSIGNMENT;
+import static confia.generated.jooq.tables.ScholarshipsDiscountInUse.SCHOLARSHIPS_DISCOUNT_IN_USE;
 
 import com.confia.kernel.InstitutionId;
 import com.confia.scholarships.application.AssignmentFilter;
@@ -82,12 +83,13 @@ public final class JooqDiscountAssignmentRepository implements DiscountAssignmen
         if (discountIds.isEmpty()) {
             return Set.of();
         }
-        return new HashSet<>(dsl.selectDistinct(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.DISCOUNT_ID)
-                .from(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT)
-                .where(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.INSTITUTION_ID.eq(institution.value()))
-                .and(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.DISCOUNT_ID.in(discountIds))
-                .and(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.STATUS.in(AwardStatus.APPROVED.code(), AwardStatus.REVOKED.code()))
-                .fetch(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.DISCOUNT_ID));
+        // In use: an assignment was approved (and maybe revoked since) or a charge was issued with the discount. The view answers both,
+        // because the second fact lives in the tables of the charges, which this module never reads.
+        return new HashSet<>(dsl.select(SCHOLARSHIPS_DISCOUNT_IN_USE.DISCOUNT_ID)
+                .from(SCHOLARSHIPS_DISCOUNT_IN_USE)
+                .where(SCHOLARSHIPS_DISCOUNT_IN_USE.INSTITUTION_ID.eq(institution.value()))
+                .and(SCHOLARSHIPS_DISCOUNT_IN_USE.DISCOUNT_ID.in(discountIds))
+                .fetch(SCHOLARSHIPS_DISCOUNT_IN_USE.DISCOUNT_ID));
     }
 
     @Override

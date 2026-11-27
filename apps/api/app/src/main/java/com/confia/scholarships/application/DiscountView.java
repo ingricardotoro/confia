@@ -18,7 +18,7 @@ import java.util.UUID;
  * @param kind {@code campaign} or {@code agreement}
  * @param percent the percentage points with two decimals, only for a percentage benefit
  * @param fixedAmount only for a fixed amount benefit
- * @param inUse whether an assignment of the discount was approved
+ * @param inUse whether an assignment of the discount was approved or a charge was issued with it
  */
 public record DiscountView(UUID id, String code, String name, String kind, String benefitType, String percent, Money fixedAmount,
         LocalDate validFrom, LocalDate validTo, boolean stackable, List<ConceptView> concepts, boolean active, long version,
