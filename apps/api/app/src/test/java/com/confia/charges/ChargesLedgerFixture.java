@@ -244,6 +244,28 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
     }
 
     /**
+     * The rows of a table that a session of the application sees when its {@code app.institution_id} is as given: {@code null} means
+     * the setting was never made and an empty text means it was made empty; neither names an institution, so neither sees a row.
+     */
+    protected static long countWithSetting(String setting, String table) throws SQLException {
+        try (Connection c = com.confia.support.SharedPostgresContainer.connectionAs("confia_admin_app")) {
+            c.setAutoCommit(false);
+            if (setting != null) {
+                try (PreparedStatement context = c.prepareStatement("select set_config('app.institution_id', ?, true)")) {
+                    context.setString(1, setting);
+                    context.execute();
+                }
+            }
+            try (PreparedStatement s = c.prepareStatement("select count(*) from " + table); ResultSet rs = s.executeQuery()) {
+                rs.next();
+                long count = rs.getLong(1);
+                c.rollback();
+                return count;
+            }
+        }
+    }
+
+    /**
      * Adds to the map of posting accounts the account of the benefits, of the type given (assumption S4: {@code INCOME} as a
      * contra-revenue or {@code EXPENSE}), and answers its identifier. Fictional account.
      */
