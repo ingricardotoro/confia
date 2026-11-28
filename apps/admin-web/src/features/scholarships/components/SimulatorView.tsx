@@ -2,6 +2,7 @@ import { Alert, Button, Card, EmptyState, ErrorState, MoneyAmount, PageHeader, S
 import type { SyntheticEvent } from "react";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
 import { OptionField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
+import { BenefitList } from "../../../shared/benefits/components/BenefitList.tsx";
 import { StatementStudentPicker, type StatementStudentPickerProps } from "../../../shared/student-lookups/components/StatementStudentPicker.tsx";
 import type { ChargeSimulation, ChargeSimulationLine } from "../scholarships-types.ts";
 
@@ -206,11 +207,7 @@ function SimulationResult({ state }: { readonly state: Extract<SimulatorResultSt
   const columns: readonly TableColumn<ChargeSimulationLine>[] = [
     { id: "concept", header: t("scholarships.simulator.columns.concept"), cell: (line) => conceptName(line.paymentConceptId) },
     { id: "base", header: t("scholarships.simulator.columns.base"), align: "end", cell: (line) => amount(line.base) },
-    {
-      id: "scholarship",
-      header: t("scholarships.simulator.columns.scholarship"),
-      cell: (line) => (line.scholarshipCode == null ? t("scholarships.simulator.noScholarship") : line.scholarshipCode),
-    },
+    { id: "benefits", header: t("scholarships.simulator.columns.benefits"), cell: (line) => <BenefitList benefits={line.benefits} /> },
     { id: "benefit", header: t("scholarships.simulator.columns.benefit"), align: "end", cell: (line) => amount(line.benefitAmount) },
     { id: "netBase", header: t("scholarships.simulator.columns.netBase"), align: "end", cell: (line) => amount(line.netBase) },
     { id: "tax", header: t("scholarships.simulator.columns.tax"), align: "end", cell: (line) => amount(line.tax) },

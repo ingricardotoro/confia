@@ -743,10 +743,9 @@
         "emptyFilteredDescription": "Cambie el filtro para ver los demás renglones.",
         "emptyFilteredAction": "Mostrar todos los renglones",
         "pagination": "Páginas de los renglones de la vista previa",
-        "scholarship": "Beca",
-        "noScholarship": "Sin beca",
         "benefit": "Beneficio",
-        "netBase": "Base neta"
+        "netBase": "Base neta",
+        "benefits": "Beneficios aplicados"
       },
       "studentLabel": "{name} ({code})",
       "conceptLabel": "{code}, {name}",
@@ -902,9 +901,9 @@
         "outstanding": "Pendiente",
         "status": "Estado",
         "actions": "Acciones",
-        "scholarship": "Beca",
         "benefit": "Beneficio",
-        "netBase": "Base neta"
+        "netBase": "Base neta",
+        "benefits": "Beneficios aplicados"
       },
       "statuses": {
         "ACTIVE": "Vigente",
@@ -939,8 +938,7 @@
       "voidActionFor": "Anular el cargo {concept}, {period}",
       "voidedOn": "Anulado el {date}",
       "voidedNotice": "Se anuló el cargo {concept}, {period}. Su reverso ya está en el libro mayor.",
-      "noConcept": "Concepto sin nombre",
-      "noScholarship": "Sin beca"
+      "noConcept": "Concepto sin nombre"
     },
     "void": {
       "title": "Anular cargo",
@@ -2484,7 +2482,6 @@
       "resultDescription": "{plan}, período {period}",
       "nothingWritten": "Es una simulación: no se generó ningún cargo ni se escribió nada en el libro mayor.",
       "noAmount": "—",
-      "noScholarship": "Sin beca",
       "caption": "Resultado de la simulación por concepto",
       "emptyTitle": "El plan no genera cargos para este período",
       "emptyDescription": "Ningún concepto del plan corresponde a este período.",
@@ -2492,12 +2489,12 @@
       "columns": {
         "concept": "Concepto",
         "base": "Base",
-        "scholarship": "Beca aplicada",
         "benefit": "Beneficio",
         "netBase": "Base neta",
         "tax": "Impuesto",
         "total": "Total",
-        "result": "Resultado"
+        "result": "Resultado",
+        "benefits": "Beneficios aplicados"
       },
       "outcomes": {
         "CREATED": "Se generaría",
@@ -2505,6 +2502,14 @@
         "ALREADY_ACCRUED_OTHER_PLAN": "Generado por otro plan",
         "ERROR": "Con error: {code}"
       }
+    }
+  },
+  "benefits": {
+    "none": "Sin beneficios",
+    "line": "{source} {code}",
+    "sources": {
+      "SCHOLARSHIP": "Beca",
+      "DISCOUNT": "Descuento"
     }
   }
 }

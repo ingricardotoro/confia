@@ -31,6 +31,8 @@ import org.jooq.impl.DSL;
  */
 public final class JooqDiscountsInForceRepository implements DiscountsInForceRepository {
 
+    private static final String ASSIGNMENT_ID = "assignment_id";
+
     private final DSLContext dsl;
 
     public JooqDiscountsInForceRepository(DSLContext dsl) {
@@ -49,7 +51,7 @@ public final class JooqDiscountsInForceRepository implements DiscountsInForceRep
                 .and(covers(institution, List.of(paymentConceptId)));
         SelectForUpdateStep<?> agreement = dsl.select(SCHOLARSHIPS_DISCOUNT.ID, SCHOLARSHIPS_DISCOUNT.CODE,
                 SCHOLARSHIPS_DISCOUNT.BENEFIT_TYPE, SCHOLARSHIPS_DISCOUNT.PERCENT, SCHOLARSHIPS_DISCOUNT.FIXED_AMOUNT,
-                SCHOLARSHIPS_DISCOUNT.CURRENCY, SCHOLARSHIPS_DISCOUNT.IS_STACKABLE)
+                SCHOLARSHIPS_DISCOUNT.CURRENCY, SCHOLARSHIPS_DISCOUNT.IS_STACKABLE, SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.ID.as(ASSIGNMENT_ID))
                 .from(SCHOLARSHIPS_DISCOUNT)
                 .join(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT)
                 .on(SCHOLARSHIPS_DISCOUNT_ASSIGNMENT.INSTITUTION_ID.eq(SCHOLARSHIPS_DISCOUNT.INSTITUTION_ID)
@@ -120,7 +122,10 @@ public final class JooqDiscountsInForceRepository implements DiscountsInForceRep
         Benefit benefit = type == BenefitType.PERCENTAGE
                 ? new Benefit(type, Percentage.of(row.get(SCHOLARSHIPS_DISCOUNT.PERCENT)), null)
                 : new Benefit(type, null, MoneyColumns.toMoney(row.get(SCHOLARSHIPS_DISCOUNT.FIXED_AMOUNT), currency));
-        return new InForce(row.get(SCHOLARSHIPS_DISCOUNT.ID), row.get(SCHOLARSHIPS_DISCOUNT.CODE),
+        // The campaign query does not select the assignment: the aliased field is absent from its rows (the plain id would match the
+        // id of the discount by name).
+        UUID assignmentId = row.field(ASSIGNMENT_ID) == null ? null : row.get(ASSIGNMENT_ID, UUID.class);
+        return new InForce(row.get(SCHOLARSHIPS_DISCOUNT.ID), row.get(SCHOLARSHIPS_DISCOUNT.CODE), assignmentId,
                 row.get(SCHOLARSHIPS_DISCOUNT.IS_STACKABLE), benefit);
     }
 }

@@ -4,6 +4,7 @@ import com.confia.catalog.application.directory.PricingDirectory;
 import com.confia.charges.domain.AccrualErrorCode;
 import com.confia.charges.domain.AccrualPeriods;
 import com.confia.charges.domain.AccrualRejection;
+import com.confia.charges.domain.AppliedBenefit;
 import com.confia.charges.domain.ChargePlan;
 import com.confia.charges.domain.ChargePlanItem;
 import com.confia.charges.domain.PlanStatus;
@@ -15,6 +16,7 @@ import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
 import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
 import com.confia.shared.security.Digests;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -43,14 +45,16 @@ final class AccrualPreviewCalculator {
     private final PostingAccountRepository postingAccounts;
     private final LedgerAccountDirectory ledgerAccounts;
     private final AwardBenefits awards;
+    private final DiscountBenefits discounts;
 
     AccrualPreviewCalculator(AccrualEngine engine, PricingDirectory pricing, PostingAccountRepository postingAccounts,
-            LedgerAccountDirectory ledgerAccounts, AwardBenefits awards) {
+            LedgerAccountDirectory ledgerAccounts, AwardBenefits awards, DiscountBenefits discounts) {
         this.engine = Objects.requireNonNull(engine, "engine");
         this.pricing = Objects.requireNonNull(pricing, "pricing");
         this.postingAccounts = Objects.requireNonNull(postingAccounts, "postingAccounts");
         this.ledgerAccounts = Objects.requireNonNull(ledgerAccounts, "ledgerAccounts");
         this.awards = Objects.requireNonNull(awards, "awards");
+        this.discounts = Objects.requireNonNull(discounts, "discounts");
     }
 
     /** The whole calculation: every line, the population and the preconditions that do not depend on the clock. */
@@ -137,7 +141,7 @@ final class AccrualPreviewCalculator {
     }
 
     /**
-     * Whether the period can post its benefits: nothing to check when no approved award in force at the first day of the period
+     * Whether the period can post its benefits: nothing to check when no approved award or discount in force at the first day of the period
      * covers a concept of the plan for a student of the population; otherwise the map must name an active account for the
      * purpose {@code BENEFITS}, of a type that purpose accepts and that holds no student balances (assumption S4 of
      * docs/cortes/scholarships-awards.md, pending the accountant).
@@ -150,7 +154,8 @@ final class AccrualPreviewCalculator {
         LocalDate on = periods.get(0).period().start();
         Set<UUID> concepts = new HashSet<>();
         periods.forEach(period -> concepts.add(period.paymentConceptId()));
-        if (!awards.anyApplicable(institution, population.stream().map(StudentPlacement::studentId).toList(), concepts, on)) {
+        List<UUID> students = population.stream().map(StudentPlacement::studentId).toList();
+        if (!awards.anyApplicable(institution, students, concepts, on) && !discounts.anyApplicable(institution, students, concepts, on)) {
             return true;
         }
         Optional<UUID> account = new PostingAccountMap(postingAccounts.list(institution)).benefits();
@@ -186,6 +191,7 @@ final class AccrualPreviewCalculator {
             Money total = null;
             UUID awardId = null;
             String scholarshipCode = null;
+            List<AppliedBenefitView> applied = List.of();
             switch (line.outcome()) {
                 case CREATED -> {
                     created++;
@@ -194,6 +200,7 @@ final class AccrualPreviewCalculator {
                     netBase = line.charge().netBase();
                     tax = line.charge().amounts().tax();
                     total = line.charge().amounts().total();
+                    applied = AppliedBenefitView.of(line.charge().benefits());
                     if (line.charge().benefit() != null) {
                         awardId = line.charge().benefit().awardId();
                         scholarshipCode = line.charge().benefit().scholarshipCode();
@@ -218,7 +225,7 @@ final class AccrualPreviewCalculator {
             if (items.size() < AccrualPreviewResult.MAX_ITEMS) {
                 items.add(new AccrualPreviewResult.Item(line.studentId(), line.paymentConceptId(), line.outcome(),
                         line.errorCode(), base, benefit, netBase, tax, total, awardId, scholarshipCode,
-                        line.existingChargeId()));
+                        line.existingChargeId(), applied));
             }
         }
         List<AccrualPreviewResult.Total> totals = new ArrayList<>();
@@ -232,9 +239,22 @@ final class AccrualPreviewCalculator {
                 calculation.blockers(), calculation.digest());
     }
 
+    /**
+     * What each benefit of a charge adds to the digest: its source (the award, or the discount and the assignment), and its amount, so a
+     * discount or an assignment that changes between the preview and the confirmation changes the digest and nothing is generated.
+     */
+    private static String benefitsOf(List<AppliedBenefit> benefits) {
+        StringBuilder text = new StringBuilder();
+        for (AppliedBenefit benefit : benefits) {
+            text.append(benefit.source()).append(':').append(benefit.awardId()).append(':').append(benefit.discountId())
+                    .append(':').append(benefit.assignmentId()).append(':').append(benefit.amount().toPlainString()).append(';');
+        }
+        return text.toString();
+    }
+
     /** The digest of every line: what would be created, with its price and its tax validity, what exists and what fails. */
     static String digestOf(List<AccrualEngine.Line> lines) {
-        StringBuilder text = new StringBuilder("v2");
+        StringBuilder text = new StringBuilder("v3");
         lines.stream().sorted(Comparator.comparing(AccrualEngine.Line::studentId)
                 .thenComparing(AccrualEngine.Line::paymentConceptId)).forEach(line -> {
                     text.append('\n').append(line.studentId()).append('|').append(line.paymentConceptId()).append('|')
@@ -245,7 +265,7 @@ final class AccrualPreviewCalculator {
                                 .append(line.charge().taxRatePeriodId()).append('|')
                                 .append(line.charge().amounts().base().toPlainString()).append('|')
                                 .append(line.charge().amounts().discount().toPlainString()).append('|')
-                                .append(line.charge().benefit() == null ? null : line.charge().benefit().awardId())
+                                .append(benefitsOf(line.charge().benefits()))
                                 .append('|')
                                 .append(line.charge().amounts().tax().toPlainString()).append('|')
                                 .append(line.charge().amounts().total().toPlainString()).append('|')

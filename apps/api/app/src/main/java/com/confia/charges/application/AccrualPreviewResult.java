@@ -45,11 +45,16 @@ public record AccrualPreviewResult(UUID planId, LocalDate periodStart, int stude
 
     /**
      * One student and concept of the preview; the amounts are present only for a charge to create. The benefit is zero and the
-     * award and the scholarship code are absent when no scholarship reduces the charge.
+     * award and the scholarship code are absent when no scholarship reduces the charge. The {@code benefits} are every benefit that
+     * reduced the charge (the scholarship and the discounts), in the order they were applied.
      */
     public record Item(UUID studentId, UUID paymentConceptId, AccrualOutcome outcome, AccrualErrorCode errorCode,
             Money base, Money benefit, Money netBase, Money tax, Money total, UUID awardId, String scholarshipCode,
-            UUID existingChargeId) {
+            UUID existingChargeId, List<AppliedBenefitView> benefits) {
+
+        public Item {
+            benefits = benefits == null ? List.of() : List.copyOf(benefits);
+        }
 
         /** The code of the error as text, or {@code null} when there is none. */
         public String error() {

@@ -53,7 +53,7 @@ public record Discount(UUID id, String code, String name, DiscountKind kind, Ben
      * code, the kind and the active flag stay.
      *
      * @param expectedVersion the version the editor saw
-     * @param inUse whether an assignment of this discount was ever approved
+     * @param inUse whether an assignment of this discount was ever approved or a charge was issued with it
      * @throws StaleVersionException when the version is not the current one
      * @throws DiscountBenefitLockedException when the benefit changes and the discount is in use
      * @throws DiscountScopeLockedException when it is in use and the validity widens or a concept is added

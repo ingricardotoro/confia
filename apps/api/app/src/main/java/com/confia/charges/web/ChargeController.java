@@ -176,6 +176,6 @@ public class ChargeController {
                 AccrualMoney.of(row.base()), AccrualMoney.of(row.benefit()), AccrualMoney.of(row.netBase()),
                 row.scholarshipAwardId(), row.scholarshipCode(), AccrualMoney.of(row.tax()), AccrualMoney.of(row.total()),
                 AccrualMoney.of(view.paid()), AccrualMoney.of(view.outstanding()), view.settled(), row.statusName(),
-                voided);
+                voided, AppliedBenefitResponse.of(row.benefits()));
     }
 }

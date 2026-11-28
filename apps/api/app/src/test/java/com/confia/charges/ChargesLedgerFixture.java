@@ -23,6 +23,9 @@ import com.confia.ledger.application.LedgerPosting;
 import com.confia.ledger.infrastructure.JooqLedgerRepository;
 import com.confia.scholarships.application.AwardBenefitsService;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
+import com.confia.scholarships.application.DiscountBenefitsService;
+import com.confia.scholarships.infrastructure.JooqDiscountsInForceRepository;
 import com.confia.scholarships.infrastructure.JooqAwardsInForceRepository;
 import com.confia.organization.infrastructure.JooqPlacementDirectory;
 import com.confia.shared.infrastructure.JooqAuditLogWriter;
@@ -115,7 +118,7 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
                 new JooqChargePlanItemRepository(dsl), new JooqAccrualRunRepository(dsl),
                 new JooqAccrualRunItemRepository(dsl), new JooqChargeRepository(dsl), new JooqPlacementDirectory(dsl),
                 new JooqEnrollmentRoster(dsl), new JooqStudentDirectory(dsl), new JooqPricingDirectory(dsl),
-                new JooqPostingAccountRepository(dsl), ledger(), awardBenefits(),
+                new JooqPostingAccountRepository(dsl), ledger(), awardBenefits(), discountBenefits(),
                 new JobAccrualRunScheduler(
                         new DbSchedulerJobScheduler(new TransactionalDataSource(dataSource()), new TracedJobSerializer()),
                         CLOCK),
@@ -128,16 +131,27 @@ public abstract class ChargesLedgerFixture extends CommittingPostgresIntegration
 
     /** The execution of a run with the scholarships given, to prove what the database refuses when the engine is wrong. */
     protected ExecuteAccrualRun executeAccrualRun(AwardBenefits awards) {
+        return executeAccrualRun(awards, discountBenefits());
+    }
+
+    /** The same, with the discounts given too. */
+    protected ExecuteAccrualRun executeAccrualRun(AwardBenefits awards, DiscountBenefits discounts) {
         return new ExecuteAccrualRun(transactionRunner(), new JooqChargePlanRepository(dsl),
                 new JooqChargePlanItemRepository(dsl), new JooqAccrualRunRepository(dsl),
                 new JooqAccrualRunItemRepository(dsl), new JooqChargeRepository(dsl), new JooqPlacementDirectory(dsl),
                 new JooqEnrollmentRoster(dsl), new JooqStudentDirectory(dsl), new JooqPricingDirectory(dsl),
-                new JooqPostingAccountRepository(dsl), ledger(), awards, ledger(), new JooqAuditLogWriter(dsl), CLOCK);
+                new JooqPostingAccountRepository(dsl), ledger(), awards, discounts, ledger(), new JooqAuditLogWriter(dsl),
+                CLOCK);
     }
 
     /** What the approved awards in force offer, read from the real database as the accrual of every process reads it. */
     protected AwardBenefits awardBenefits() {
         return new AwardBenefitsService(new JooqAwardsInForceRepository(dsl));
+    }
+
+    /** What the discounts in force offer, read from the real database as the accrual of every process reads it. */
+    protected DiscountBenefits discountBenefits() {
+        return new DiscountBenefitsService(new JooqDiscountsInForceRepository(dsl));
     }
 
     /** Requests and executes the accrual of February for the plan: one charge per student. */

@@ -26,6 +26,7 @@ import com.confia.ledger.application.api.LedgerAccountDirectory;
 import com.confia.ledger.application.api.LedgerPostingApi;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.jobs.JobDefinition;
 import com.confia.shared.jobs.OneTimeJob;
@@ -82,9 +83,10 @@ public class ChargesWorkerConfiguration {
             ChargePlanItemRepository planItems, AccrualRunRepository runs, AccrualRunItemRepository runItems,
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, PostingAccountRepository postingAccounts, LedgerAccountDirectory ledgerAccounts,
-            AwardBenefits awards, LedgerPostingApi ledger, AuditLogWriter auditLogWriter, Clock clock) {
+            AwardBenefits awards, DiscountBenefits discounts, LedgerPostingApi ledger, AuditLogWriter auditLogWriter,
+            Clock clock) {
         return new ExecuteAccrualRun(transactionRunner, plans, planItems, runs, runItems, charges, placements, roster,
-                students, pricing, postingAccounts, ledgerAccounts, awards, ledger, auditLogWriter, clock);
+                students, pricing, postingAccounts, ledgerAccounts, awards, discounts, ledger, auditLogWriter, clock);
     }
 
     @Bean

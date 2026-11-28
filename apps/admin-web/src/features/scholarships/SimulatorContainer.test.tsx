@@ -75,8 +75,8 @@ describe("the simulator page", () => {
     const table = await screen.findByRole("table", { name: "Resultado de la simulación por concepto" }, TIMEOUT);
     const row = within(within(table).getByRole("row", { name: /MENS · Mensualidad/ }));
     expect(row.getByText("L 1,100.00")).toBeInTheDocument();
-    expect(row.getByText("BECA25")).toBeInTheDocument();
-    expect(row.getByText("L 275.00")).toBeInTheDocument();
+    expect(row.getByText("Beca BECA25")).toBeInTheDocument();
+    expect(row.getAllByText("L 275.00")).toHaveLength(2);
     expect(row.getByText("L 825.00")).toBeInTheDocument();
     expect(row.getByText("L 123.75")).toBeInTheDocument();
     expect(row.getByText("L 948.75")).toBeInTheDocument();
@@ -105,18 +105,19 @@ describe("the simulator page", () => {
               outcome: "CREATED",
               base: { amount: "1000.00", currency: "HNL" },
               benefitAmount: { amount: "0.00", currency: "HNL" },
+              benefits: [],
               netBase: { amount: "1000.00", currency: "HNL" },
               tax: { amount: "150.00", currency: "HNL" },
               total: { amount: "1150.00", currency: "HNL" },
             },
-            { paymentConceptId: "00000000-0000-4000-8000-000000007002", outcome: "ERROR", errorCode: "NO_PRICE" },
+            { paymentConceptId: "00000000-0000-4000-8000-000000007002", outcome: "ERROR", errorCode: "NO_PRICE", benefits: [] },
           ],
         }),
       ),
     );
 
     const table = await screen.findByRole("table", { name: "Resultado de la simulación por concepto" }, TIMEOUT);
-    expect(within(within(table).getByRole("row", { name: /MENS · Mensualidad/ })).getByText("Sin beca")).toBeInTheDocument();
+    expect(within(within(table).getByRole("row", { name: /MENS · Mensualidad/ })).getByText("Sin beneficios")).toBeInTheDocument();
     const failing = within(within(table).getByRole("row", { name: /Con error: NO_PRICE/ }));
     expect(failing.getByText("No disponible")).toBeInTheDocument();
     expect(failing.getAllByText("—").length).toBeGreaterThan(0);

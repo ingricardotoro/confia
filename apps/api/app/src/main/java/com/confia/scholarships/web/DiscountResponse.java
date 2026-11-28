@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * A discount with its kind, benefit, validity, stackable flag, covered concepts, state and version. Every amount is rounded by the
- * server to the minor unit. {@code inUse} tells whether an assignment of it was approved, so the type and the value of its benefit no
+ * server to the minor unit. {@code inUse} tells whether an assignment of it was approved or a charge was issued with it, so the type and the value of its benefit no
  * longer change and its validity and concepts only narrow.
  */
 public record DiscountResponse(

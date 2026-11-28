@@ -1,5 +1,6 @@
 import { Alert, Button, EmptyState, MoneyAmount, PageHeader, Pagination, Table, type TableColumn } from "@confia/ui";
 import { useAdminText } from "../../../i18n/use-admin-text.ts";
+import { BenefitList } from "../../../shared/benefits/components/BenefitList.tsx";
 import { formatInstant, formatIsoDate } from "../../../shared/format/format-date.ts";
 import { OptionField, TextField, type Option } from "../../../shared/resource-screen/components/fields.tsx";
 import type { ListTableState, ResourceNotice, ResourcePagination } from "../../../shared/resource-screen/components/ResourceScreen.tsx";
@@ -59,7 +60,7 @@ export function StudentChargesView({ state, picker, chosen, filters, rows, table
     { id: "concept", header: t("charges.studentCharges.columns.concept"), cell: conceptOf },
     { id: "dueOn", header: t("charges.studentCharges.columns.dueOn"), sortable: true, cell: (row) => formatIsoDate(row.dueOn) },
     { id: "base", header: t("charges.studentCharges.columns.base"), align: "end", cell: (row) => <MoneyAmount value={row.base} size="sm" /> },
-    { id: "scholarship", header: t("charges.studentCharges.columns.scholarship"), cell: (row) => (row.scholarshipCode == null ? t("charges.studentCharges.noScholarship") : row.scholarshipCode) },
+    { id: "benefits", header: t("charges.studentCharges.columns.benefits"), cell: (row) => <BenefitList benefits={row.benefits} /> },
     { id: "benefit", header: t("charges.studentCharges.columns.benefit"), align: "end", cell: (row) => <MoneyAmount value={row.benefitAmount} size="sm" /> },
     { id: "netBase", header: t("charges.studentCharges.columns.netBase"), align: "end", cell: (row) => <MoneyAmount value={row.netBase} size="sm" /> },
     { id: "tax", header: t("charges.studentCharges.columns.tax"), align: "end", cell: (row) => <MoneyAmount value={row.tax} size="sm" /> },

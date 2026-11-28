@@ -132,6 +132,66 @@ rechaza, y `scholarships:void` revoca.
   que se emitan después.
 - Cinco códigos de problema nuevos: `duplicate-discount-code`, `discount-benefit-locked`, `discount-scope-locked`,
   `discount-assignment-overlap` e `invalid-discount-assignment-state`. La autoaprobación reutiliza `self-approval-forbidden` (403).
-- Pendiente de T2: cascada, detalle por beneficio en el cargo, asiento, vista previa, cargos del estudiante y simulador; ampliar «en uso» con los
+- Pendiente de T2 (hecho en T2, ver «Lo construido (backend T2)»): cascada, detalle por beneficio en el cargo, asiento, vista previa, cargos del estudiante y simulador; ampliar «en uso» con los
   cargos emitidos. Pendiente de T3: `packages/contracts` y pantallas. `docs/03-seguridad.md` §5.3 no se actualizó con la segregación de las
   asignaciones de convenio.
+
+## Lo construido (backend T2, 2026-11-26)
+
+El motor de devengo aplica la beca y los descuentos de un cargo con la regla de acumulación; la vista previa, el simulador y los cargos del
+estudiante muestran la lista de beneficios aplicados. Queda T3 (contrato en `packages/contracts` y pantallas).
+
+- **Dominio de `charges` (puro, con `Money` y `HALF_UP`).** `BenefitStacking` decide qué beneficios aplican y cuánto. Si todos los que aplican
+  son acumulables, los aplica en cascada: la beca sobre la base bruta (con su tope por período como en el corte 1), y después cada descuento
+  sobre lo que queda, en el orden que entrega `scholarships` (porcentaje antes que monto fijo y por código); cada paso se redondea `HALF_UP` a
+  dos decimales, nunca supera lo que queda y un paso que no da nada no deja línea. Si algún descuento que aplica no es acumulable, aplica solo
+  el de mayor beneficio calculado sobre la base bruta; con empate gana la beca y, entre descuentos, el código menor (después el identificador).
+  `AppliedBenefit` es cada beneficio (origen, código copiado y monto), `DiscountCandidate` y `DiscountsStep` son la entrada de los descuentos,
+  y `ChargeEvaluator` calcula el impuesto sobre la base neta. `ComputedCharge` guarda la lista de beneficios; `benefit()` sigue devolviendo la beca.
+- **`scholarships`.** `DiscountBenefits.Applicable` y `DiscountsInForceRepository.InForce` agregan la asignación aprobada que hace aplicar un
+  convenio (`assignmentId`, vacía en una campaña); se conserva el constructor anterior. `DiscountAssignmentRepository.inUse` lee la vista
+  `scholarships_discount_in_use`, porque «tiene un cargo emitido» vive en las tablas de `charges`, que este módulo no lee.
+- **Migración `V40__add_discount_benefits_to_charges.sql`** (solo agrega; ninguna fila existente se actualiza ni se borra):
+  - Tabla `charges_charge_benefit`, solo inserción (`UPDATE`, `DELETE` y `TRUNCATE` rechazados), con RLS forzada: una línea por beneficio, en
+    orden (`position`), con el origen (`SCHOLARSHIP` o `DISCOUNT`), el código copiado, la beca o el descuento, la asignación en un convenio, el monto
+    y la moneda. A lo más una línea de beca por cargo y una línea por descuento.
+  - La base rechaza, también al dueño: una línea que no es la beca del cargo o cuyo monto no es el beneficio de su beca limitado al resto del
+    tope del período y a la base (regla de V38, ahora sobre las líneas de beca: el beneficio de un descuento no gasta el tope); una línea de un
+    descuento inactivo, fuera de su vigencia en la fecha de precio (ambos extremos), que no cubre el concepto, con otro código, o con un monto mayor
+    que el beneficio del descuento sobre la base; un convenio sin una asignación aprobada del estudiante, del descuento y vigente en la fecha, y una
+    campaña con asignación; líneas que suman más que el beneficio del cargo; y, al terminar la transacción (disparador diferido), un cargo cuyo
+    beneficio no es la suma de sus líneas, con beca sin línea de beca (o al revés), o con líneas que se acumulan cuando algún descuento no es acumulable.
+  - `charges_charge_benefit_chk` se relaja: la beca y su código van juntos y una beca implica beneficio, pero un cargo puede llevar solo
+    descuentos. Todo cargo existente la cumple. El disparador del cargo ya no compara el monto del beneficio con una sola beca; el asiento sigue
+    exigiendo UN débito por el beneficio total. `charges_award_benefit_given` suma las líneas de beca de los cargos no anulados del período y, para
+    un cargo anterior a las líneas (sin líneas), su beneficio completo.
+  - «En uso» incluye ahora «un cargo emitido con el descuento» (`CREATE OR REPLACE` de `scholarships_discount_guard` y de
+    `scholarships_discount_concept_before_insert`, y la vista `scholarships_discount_in_use`).
+- **Motor, asiento y lectura.** Una sola transacción por cargo; el débito a `BENEFITS` es el beneficio total (S2). La vista previa, el trabajador y el
+  simulador pasan por el mismo `AccrualEngine`. El resumen de la vista previa pasó a la versión `v3` e incluye cada beneficio (origen, asignación y
+  monto): si un descuento o una asignación cambia entre la vista previa y la confirmación, la ejecución se rechaza con `preview-outdated` y no se
+  genera nada. Con descuentos en vigor para la población, el período exige la cuenta `BENEFITS`, igual que con becas. La vista previa, los cargos del
+  estudiante y el simulador agregan `benefits` (origen, código, identificadores y monto), sin quitar ni renombrar nada: un cargo anterior a las
+  líneas muestra su beca como único beneficio. `admin.openapi.json` regenerado (un esquema nuevo, `AppliedBenefit`, y el campo `benefits`; sin
+  operaciones nuevas); `packages/contracts` no se regeneró (T3).
+- **Pruebas nuevas.** Dominio: `BenefitStackingTest` (15) y `ChargeEvaluatorDiscountsTest` (5). Base real: `AccrualDiscountsIT` (38: el ejemplo de
+  aceptación con su asiento, el caso no acumulable, orden de la cascada, suma mayor que la base, empates, campaña que empieza o termina el día de
+  emisión, concepto no cubierto, convenio sin asignación, pendiente, rechazada, revocada y aprobada, `HALF_UP` por paso, tope con descuento,
+  cambio entre vista previa y confirmación, repetir el período, simulador igual al motor, «en uso» y lo que rechaza la base) y
+  `ChargeBenefitsMigrationIT` (2: una base migrada de V39 a V40 con cargos del corte 1 los deja intactos y se leen igual).
+
+### Desviaciones y pendientes
+
+- **Compatibilidad probada con una base desechable**, no con la base compartida: los cargos del corte 1 ya no se pueden escribir (la base exige las
+  líneas), así que la prueba migra una base nueva hasta V39, escribe cargos como los de V37 y V38 con el superusuario y los disparadores apagados, migra
+  a V40 y comprueba que siguen iguales, que `benefitGiven` y `charges_award_benefit_given` los cuentan contra el tope y que la lista de cargos muestra
+  su beca como único beneficio.
+- **El disparador diferido (suma de líneas igual al beneficio) se ejercita en cada devengo**, que lo cumple, y el exceso lo rechaza una prueba directa;
+  no hay una prueba negativa del caso «las líneas suman menos», porque ningún camino de la aplicación puede producirlo y escribir un cargo a mano exige
+  un asiento del libro mayor.
+- Una línea solo puede agregarse mientras la suma no supere el beneficio del cargo; un cargo anterior a las líneas (sin líneas) aceptaría una línea que
+  coincida con su beneficio. No es un camino de la aplicación; queda anotado para la revisión de seguridad.
+- La función `charges_award_benefit_given` se concede a `confia_admin_app` porque el disparador de la línea la llama con los derechos de quien inserta.
+- `IntegrityCheck` no compara las líneas; el asiento sigue comparándose contra total más beneficio.
+- Los constructores de `ManageAccrual`, `ExecuteAccrualRun` y `SimulateCharges` sin descuentos se conservan (`PaymentsFixture` los usa); los procesos reales
+  usan los nuevos, que reciben `DiscountBenefits`.

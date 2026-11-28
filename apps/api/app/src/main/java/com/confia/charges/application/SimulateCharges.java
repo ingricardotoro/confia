@@ -13,6 +13,7 @@ import com.confia.kernel.InstitutionId;
 import com.confia.kernel.Money;
 import com.confia.organization.application.directory.PlacementDirectory;
 import com.confia.scholarships.application.api.AwardBenefits;
+import com.confia.scholarships.application.api.DiscountBenefits;
 import com.confia.shared.audit.AuditLogWriter;
 import com.confia.shared.security.AuthenticatedActor;
 import com.confia.shared.security.TransactionRunner;
@@ -41,17 +42,29 @@ public final class SimulateCharges {
     public SimulateCharges(TransactionRunner transactionRunner, ChargePlanRepository plans, ChargePlanItemRepository items,
             ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
             PricingDirectory pricing, AwardBenefits awards, AuditLogWriter auditLogWriter) {
+        this(transactionRunner, plans, items, charges, placements, roster, students, pricing, awards, DiscountBenefits.NONE,
+                auditLogWriter);
+    }
+
+    public SimulateCharges(TransactionRunner transactionRunner, ChargePlanRepository plans, ChargePlanItemRepository items,
+            ChargeRepository charges, PlacementDirectory placements, EnrollmentRoster roster, StudentDirectory students,
+            PricingDirectory pricing, AwardBenefits awards, DiscountBenefits discounts, AuditLogWriter auditLogWriter) {
         this.transactionRunner = Objects.requireNonNull(transactionRunner, "transactionRunner");
         this.plans = Objects.requireNonNull(plans, "plans");
         this.items = Objects.requireNonNull(items, "items");
         this.students = Objects.requireNonNull(students, "students");
-        this.engine = new AccrualEngine(placements, roster, students, pricing, charges, awards);
+        this.engine = new AccrualEngine(placements, roster, students, pricing, charges, awards, discounts);
         this.auditLogWriter = Objects.requireNonNull(auditLogWriter, "auditLogWriter");
     }
 
     /** One concept of the period and what the engine found for the student. The amounts are present only for a charge to create. */
     public record Line(UUID paymentConceptId, AccrualOutcome outcome, AccrualErrorCode errorCode, Money base, Money benefit,
-            Money netBase, UUID scholarshipAwardId, String scholarshipCode, Money tax, Money total, UUID existingChargeId) {
+            Money netBase, UUID scholarshipAwardId, String scholarshipCode, Money tax, Money total, UUID existingChargeId,
+            List<AppliedBenefitView> benefits) {
+
+        public Line {
+            benefits = benefits == null ? List.of() : List.copyOf(benefits);
+        }
 
         /** The code of the error as text, or {@code null} when there is none. */
         public String error() {
@@ -105,12 +118,12 @@ public final class SimulateCharges {
     private static Line toLine(AccrualEngine.Line line) {
         if (line.outcome() != AccrualOutcome.CREATED) {
             return new Line(line.paymentConceptId(), line.outcome(), line.errorCode(), null, null, null, null, null, null,
-                    null, line.existingChargeId());
+                    null, line.existingChargeId(), List.of());
         }
         var charge = line.charge();
         var benefit = charge.benefit();
         return new Line(line.paymentConceptId(), line.outcome(), null, charge.amounts().base(), charge.amounts().discount(),
                 charge.netBase(), benefit == null ? null : benefit.awardId(), benefit == null ? null : benefit.scholarshipCode(),
-                charge.amounts().tax(), charge.amounts().total(), null);
+                charge.amounts().tax(), charge.amounts().total(), null, AppliedBenefitView.of(charge.benefits()));
     }
 }
